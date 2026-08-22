@@ -97,6 +97,19 @@
   box-shadow: var(--shadow-pop);
 }
 .actionsNote { margin-right: auto; font-size: var(--text-sm); color: var(--ink-500); }
+.copyPreview {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  border: var(--border);
+  border-radius: var(--r-md);
+  background: var(--paper-sunk);
+  padding: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+  line-height: 1.6;
+}
 
 .results { display: grid; gap: var(--sp-2); }
 .result {
