@@ -147,10 +147,13 @@ async def _run_stage(
         )
 
         try:
+            run_options: dict[str, Any] | None = None
+            if settings.model_provider != "copilot_sdk":
+                run_options = {"response_format": output_model}
             stream = agent.run(
                 prompt,
                 stream=True,
-                options={"response_format": output_model},
+                options=run_options,
             )
 
             async for update in stream:
