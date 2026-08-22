@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Azure
+.azure/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
