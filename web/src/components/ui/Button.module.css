@@ -1,0 +1,38 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color .13s ease, border-color .13s ease, color .13s ease;
+}
+.btn:disabled { cursor: not-allowed; opacity: .45; }
+.btn:focus-visible { outline: none; box-shadow: var(--focus); border-color: var(--clay); }
+
+/* ---- size ---- */
+.sm { padding: 3px 9px; font-size: var(--text-sm); }
+.md { padding: 6px 13px; font-size: var(--text-base); }
+.lg { padding: 10px 20px; font-size: var(--text-md); }
+
+/* ---- variant ---- */
+.primary { background: var(--clay); border-color: var(--clay); color: #fffefb; }
+.primary:hover:not(:disabled) { background: var(--clay-600); border-color: var(--clay-600); }
+
+.default { background: var(--surface); border-color: var(--line-strong); color: var(--ink-700); }
+.default:hover:not(:disabled) { background: var(--surface-hover); }
+
+.quiet { background: transparent; border-color: transparent; color: var(--ink-500); }
+.quiet:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink-700); }
+
+.danger { background: var(--surface); border-color: var(--line-strong); color: var(--brick); }
+.danger:hover:not(:disabled) { background: var(--brick-050); border-color: var(--brick-100); }
+
+.block { width: 100%; }
+
+/* 아이콘 전용 정사각 버튼 */
+.icon { padding: 0; width: 28px; height: 28px; }
+.icon.lg { width: 34px; height: 34px; }

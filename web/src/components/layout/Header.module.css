@@ -1,0 +1,104 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-6);
+  background: var(--paper);
+  border-bottom: var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  text-decoration: none;
+  color: var(--ink-900);
+  flex: none;
+}
+.mark {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -.2px;
+}
+.mark em {
+  font-style: normal;
+  color: var(--clay);
+}
+.tagline {
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  letter-spacing: .2px;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  margin-left: var(--sp-2);
+  font-size: var(--text-base);
+  color: var(--ink-500);
+  overflow: hidden;
+}
+.crumbs svg { color: var(--ink-200); flex: none; }
+.crumb {
+  color: var(--ink-500);
+  text-decoration: none;
+  padding: 2px 5px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.crumb:hover { background: var(--surface-hover); color: var(--ink-900); }
+.current { color: var(--ink-900); font-weight: 500; }
+
+.right { margin-left: auto; display: flex; align-items: center; gap: var(--sp-2); }
+
+.mode {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ochre-700);
+  background: var(--ochre-050);
+  border: 1px solid var(--ochre-100);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 3px 4px 3px 3px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+.user:hover { background: var(--surface-hover); border-color: var(--line); }
+.avatar {
+  width: 24px; height: 24px;
+  border-radius: var(--r-sm);
+  background: var(--clay-100);
+  color: var(--clay-700);
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  flex: none;
+  object-fit: cover;
+}
+.userName { font-size: var(--text-sm); color: var(--ink-700); }
+
+@media (max-width: 720px) {
+  .header { padding: 0 var(--sp-4); gap: var(--sp-2); }
+  .tagline, .userName { display: none; }
+  .crumb { max-width: 120px; }
+}

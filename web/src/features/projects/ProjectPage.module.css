@@ -1,0 +1,34 @@
+.repoRow { display: flex; align-items: center; gap: 7px; }
+.owner { color: var(--ink-400); font-family: var(--font-mono); font-size: var(--text-sm); }
+.repoName { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--ink-900); }
+
+.counts { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--text-sm); color: var(--ink-500); }
+.count { display: inline-flex; align-items: center; gap: 4px; }
+.count b { font-family: var(--font-mono); font-weight: 500; color: var(--ink-700); }
+
+.lang { display: inline-flex; align-items: center; gap: 5px; }
+.langDot { width: 7px; height: 7px; border-radius: 50%; background: var(--clay-300); }
+
+/* 하단 고정 회의록 추가 바 */
+.footBar {
+  margin-top: var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.footText { font-size: var(--text-sm); color: var(--ink-500); margin-right: auto; line-height: 1.6; }
+.footText b { color: var(--ink-700); font-weight: 600; }
+
+.meetingTitle { display: flex; align-items: center; gap: 7px; }
+.preview {
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}

@@ -1,0 +1,69 @@
+.wrap { position: relative; display: inline-flex; }
+
+.menu {
+  position: absolute;
+  z-index: 40;
+  min-width: 208px;
+  padding: var(--sp-1);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: pop .12s ease-out;
+}
+.bottomRight { top: calc(100% + 6px); right: 0; }
+.bottomLeft  { top: calc(100% + 6px); left: 0; }
+.topRight    { bottom: calc(100% + 6px); right: 0; }
+.topLeft     { bottom: calc(100% + 6px); left: 0; }
+
+/* 호버로 열리는 메뉴는 버튼과 메뉴 사이에 틈이 있으면 닫혀버린다.
+   보이지 않는 다리를 놓아 커서가 지나갈 수 있게 한다. */
+.menu::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 8px;
+}
+.bottomRight::before, .bottomLeft::before { top: -8px; }
+.topRight::before, .topLeft::before { bottom: -8px; }
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--ink-700);
+  text-align: left;
+  cursor: pointer;
+}
+.item:hover { background: var(--surface-hover); color: var(--ink-900); }
+.item:focus-visible { outline: none; background: var(--surface-hover); box-shadow: var(--focus); }
+.item svg { color: var(--ink-400); }
+.item:hover svg { color: var(--clay); }
+.itemBody { display: flex; flex-direction: column; gap: 1px; }
+.itemDesc { font-size: var(--text-xs); color: var(--ink-500); }
+
+.sep { height: 1px; background: var(--line-soft); margin: var(--sp-1) 0; }
+.label {
+  padding: 5px 9px 3px;
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
