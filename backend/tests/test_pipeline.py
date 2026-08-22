@@ -171,13 +171,17 @@ async def test_pipeline_skips_downstream_when_no_tasks():
     assert {s.stage for s in stages} == {"extract"}
 
 
-def test_extraction_result_accepts_title_alias_for_decisions():
+def test_extraction_result_accepts_title_and_decision_aliases_for_decisions():
     result = ExtractionResult.model_validate(
         {
             "summary": "요약",
-            "decisions": [{"title": "배포 순서 프로덕션으로 정함"}],
+            "decisions": [
+                {"title": "배포 순서 프로덕션으로 정함"},
+                {"decision": "SSE 30초 타임아웃으로 확정"},
+            ],
             "tasks": [],
             "open_questions": [],
         }
     )
     assert result.decisions[0].statement == "배포 순서 프로덕션으로 정함"
+    assert result.decisions[1].statement == "SSE 30초 타임아웃으로 확정"
