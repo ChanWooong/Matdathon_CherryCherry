@@ -1,0 +1,72 @@
+.field { display: flex; flex-direction: column; gap: 5px; }
+.label { font-size: var(--text-sm); color: var(--ink-500); font-weight: 500; }
+.hint { font-size: var(--text-xs); color: var(--ink-500); }
+.error { font-size: var(--text-xs); color: var(--brick); }
+
+.control {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  padding: 7px 10px;
+  font: inherit;
+  color: var(--ink-900);
+  transition: border-color .13s ease, box-shadow .13s ease;
+}
+.control::placeholder { color: var(--ink-400); }
+.control:hover:not(:disabled) { border-color: var(--ink-200); }
+.control:focus { outline: none; border-color: var(--clay); box-shadow: var(--focus); }
+.control:disabled { background: var(--paper-sunk); color: var(--ink-400); cursor: not-allowed; }
+.control.invalid { border-color: var(--brick); }
+
+textarea.control { resize: vertical; line-height: 1.7; min-height: 90px; }
+
+/* 회의록처럼 긴 글을 쓰는 입력 — 노트 느낌으로 라인만 남긴다 */
+.paper {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.85;
+}
+
+/* ---- search ---- */
+.search { position: relative; display: flex; align-items: center; }
+.search > svg { position: absolute; left: 10px; color: var(--ink-400); pointer-events: none; }
+.search .control { padding-left: 31px; }
+
+/* ---- checkbox ---- */
+.check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+.check input {
+  appearance: none;
+  width: 16px; height: 16px;
+  flex: none;
+  margin: 3px 0 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.check input::after {
+  content: '';
+  width: 9px; height: 9px;
+  clip-path: polygon(14% 44%, 0 65%, 40% 100%, 100% 16%, 84% 0%, 39% 66%);
+  background: #fffefb;
+  transform: scale(0);
+  transition: transform .12s ease;
+}
+.check input:checked { background: var(--clay); border-color: var(--clay); }
+.check input:checked::after { transform: scale(1); }
+.check input:focus-visible { outline: none; box-shadow: var(--focus); }
+.check input:disabled { background: var(--paper-sunk); cursor: not-allowed; }
+.checkBody { font-size: var(--text-base); }
