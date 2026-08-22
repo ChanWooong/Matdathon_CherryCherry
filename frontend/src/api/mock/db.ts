@@ -1,5 +1,6 @@
-import type { Issue, Meeting, ProjectAccent, User } from '../../types';
+import type { Issue, Meeting, ProjectAccent, Repo, User } from '../../types';
 import { AVAILABLE_REPOS, SEED_ISSUES, SAMPLE_MEETING } from './fixtures';
+import { IS_MOCK } from '../config';
 
 /**
  * 백엔드가 없는 동안 쓰는 로컬 저장소.
@@ -7,7 +8,7 @@ import { AVAILABLE_REPOS, SEED_ISSUES, SAMPLE_MEETING } from './fixtures';
  * 백엔드가 붙으면 이 파일만 버리면 된다.
  */
 
-const KEY = 'm2i.db.v2';
+const KEY = IS_MOCK ? 'm2i.db.v3.mock' : 'm2i.db.v3.live';
 
 export interface ProjectRow {
   id: string;
@@ -22,6 +23,7 @@ interface Shape {
   user: User | null;
   projects: ProjectRow[];
   meetings: Meeting[];
+  availableRepos: Repo[];
   /** 앱에서 만든 이슈 (레포 id 별) */
   createdIssues: Record<string, Issue[]>;
   seq: number;
@@ -31,6 +33,31 @@ const ACCENTS: ProjectAccent[] = ['clay', 'moss', 'ochre', 'slate', 'brick'];
 
 function seed(): Shape {
   const now = new Date().toISOString();
+  if (!IS_MOCK) {
+    return {
+      user: null,
+      projects: [{
+        id: 'demo',
+        name: 'MeetToIssue 데모',
+        description: '회의록에서 검수된 GitHub 이슈까지 이어지는 채점 시나리오',
+        accent: 'clay',
+        createdAt: now,
+        repoIds: [],
+      }],
+      meetings: [{
+        id: 'demo-meeting',
+        projectId: 'demo',
+        title: '스프린트 회의 — 로그인 안정화',
+        content: SAMPLE_MEETING,
+        createdAt: now,
+        updatedAt: now,
+        issueCount: 0,
+      }],
+      availableRepos: [],
+      createdIssues: {},
+      seq: 100,
+    };
+  }
   return {
     user: null,
     projects: [
@@ -65,12 +92,13 @@ function seed(): Shape {
         id: 'm2',
         projectId: 'p1',
         title: '8/14 킥오프',
-        content: `참석자: 민지, 재호, 수진\n\n- 데모 시나리오는 회의록 붙여넣기부터 이슈 생성까지로 정함\n- 인증은 GitHub OAuth 로 확정\n- 화면 흐름 초안은 수진이 8/16까지 정리`,
+        content: `참석자: 민지, 재호, 수진\n\n- 데모 시나리오는 회의록 붙여넣기부터 이슈 생성까지로 정함\n- 채점 경로는 인증 없이 진행하기로 확정\n- 화면 흐름 초안은 수진이 8/16까지 정리`,
         createdAt: now,
         updatedAt: now,
         issueCount: 2,
       },
     ],
+    availableRepos: AVAILABLE_REPOS,
     createdIssues: {},
     seq: 100,
   };
@@ -83,6 +111,7 @@ function read(): Shape {
   try {
     const raw = localStorage.getItem(KEY);
     cache = raw ? (JSON.parse(raw) as Shape) : seed();
+    cache.availableRepos ??= AVAILABLE_REPOS;
   } catch {
     cache = seed();
   }
@@ -123,7 +152,13 @@ export function pickAccent(index: number): ProjectAccent {
 
 /** 레포 id → 레포 메타 */
 export function findRepo(id: number) {
-  return AVAILABLE_REPOS.find((r) => r.id === id);
+  return read().availableRepos.find((r) => r.id === id);
+}
+
+export function saveAvailableRepos(repos: Repo[]) {
+  update((db) => {
+    db.availableRepos = repos;
+  });
 }
 
 /** 시드 이슈 + 앱에서 만든 이슈 */

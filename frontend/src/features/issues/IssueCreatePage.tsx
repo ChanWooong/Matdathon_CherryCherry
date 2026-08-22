@@ -144,7 +144,12 @@ export function IssueCreatePage() {
       const res = await issuesApi.createIssuesFromDrafts(repo.id, picked, meetingId ?? undefined);
       setResults(res);
       setStage('done');
-      toast(`이슈 ${res.filter((r) => r.ok).length}건을 만들었습니다`, 'success');
+      const succeeded = res.filter((result) => result.ok).length;
+      const failed = res.length - succeeded;
+      toast(
+        failed ? `${succeeded}건 생성, ${failed}건 실패했습니다` : `이슈 ${succeeded}건을 만들었습니다`,
+        failed ? 'error' : 'success',
+      );
     } catch (e) {
       toast(e instanceof Error ? e.message : '이슈를 만들지 못했습니다', 'error');
     } finally {
@@ -347,23 +352,42 @@ export function IssueCreatePage() {
         {stage === 'done' && (
           <div className={s.split}>
             <div>
-              <Banner tone="success" title={`이슈 ${results.filter((r) => r.ok).length}건을 만들었습니다`}>
-                {repo?.fullName} 에 등록되었습니다.
+              <Banner
+                tone={results.some((result) => !result.ok) ? 'warn' : 'success'}
+                title={`성공 ${results.filter((result) => result.ok).length}건 · 실패 ${results.filter((result) => !result.ok).length}건`}
+              >
+                성공한 이슈는 {repo?.fullName}에 등록되었습니다.
               </Banner>
               <div className={s.results} style={{ marginTop: 'var(--sp-4)' }}>
                 {results.map((r) => (
                   <div key={r.draftId} className={s.result}>
-                    <Icon name="check-circle" size={16} />
+                    <Icon name={r.ok ? 'check-circle' : 'alert'} size={16} />
                     <span className={s.resultTitle}>{r.title}</span>
-                    <span className={s.resultNum}>#{r.number}</span>
-                    <Button size="sm" icon="external" onClick={() => r.url && window.open(r.url, '_blank', 'noopener')}>
-                      열기
-                    </Button>
+                    {r.ok ? (
+                      <>
+                        <span className={s.resultNum}>#{r.number}</span>
+                        <Button size="sm" icon="external" onClick={() => r.url && window.open(r.url, '_blank', 'noopener')}>
+                          열기
+                        </Button>
+                      </>
+                    ) : (
+                      <span className={s.resultNum}>{r.error ?? '생성 실패'}</span>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
             <aside className={s.aside}>
+              <Card>
+                <CardHead title="자동화 효과" sub="데모 기준" />
+                <CardBody>
+                  <div className={s.summary}>
+                    <div className={s.sumRow}><b>30분 → 1분</b><span>회의 후 수작업 정리 시간</span></div>
+                    <div className={s.sumRow}><b>3단계 검수</b><span>추출 · 구조화 · 누락 확인</span></div>
+                    <div className={s.sumRow}><b>근거 보존</b><span>모든 초안에 회의록 인용 포함</span></div>
+                  </div>
+                </CardBody>
+              </Card>
               <Card>
                 <CardHead title="다음으로" />
                 <CardBody>

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import secrets
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -16,6 +15,8 @@ from app.agents.pipeline import (
     StageFailure,
     build_workflow,
 )
+from app.api.dependencies import get_github, require_api_key
+from app.api.github_routes import router as github_router
 from app.core.config import Settings, get_settings
 from app.schemas import (
     AnalysisResult,
@@ -34,50 +35,12 @@ from app.services.history import HistoryStore
 
 logger = logging.getLogger(__name__)
 
-
-def require_api_key(
-    request: Request, settings: Settings = Depends(get_settings)
-) -> None:
-    """공유 시크릿 기반 접근 제어.
-
-    이 서버는 **자신의** GitHub 토큰으로 비공개 리포를 조회하고 이슈를 생성한다.
-    따라서 인증 없이 공개되면 누구나 그 토큰의 권한을 그대로 빌려 쓸 수 있다.
-    (요청 본문의 `approved` 필드는 UX 장치일 뿐 보안 통제가 아니고,
-    CORS는 브라우저에만 적용되므로 둘 다 접근 제어가 되지 못한다.)
-
-    - API_KEY가 설정돼 있으면 모든 /api 요청에 `X-API-Key` 헤더를 요구한다.
-    - 로컬/개발 환경에서 비어 있으면 통과시켜 개발 편의를 유지한다.
-    - 운영 환경에서 비어 있으면 열린 채로 뜨는 대신 503으로 거부한다.
-    """
-    expected = settings.api_key
-    if not expected:
-        if settings.is_production:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "서버에 API_KEY가 설정되지 않았습니다. "
-                    "운영 환경에서는 인증 없이 API를 열 수 없습니다."
-                ),
-            )
-        return
-
-    provided = request.headers.get("x-api-key", "")
-    if not secrets.compare_digest(provided, expected):
-        raise HTTPException(status_code=401, detail="유효하지 않은 API 키입니다.")
-
-
 router = APIRouter(prefix="/api", dependencies=[Depends(require_api_key)])
+router.include_router(github_router)
 
 
 def get_history(request: Request) -> HistoryStore:
     return request.app.state.history
-
-
-def get_github(settings: Settings = Depends(get_settings)) -> GitHubService:
-    try:
-        return GitHubService(settings.github_token, settings)
-    except GitHubError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 # --------------------------------------------------------------------------

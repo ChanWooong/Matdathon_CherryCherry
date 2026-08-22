@@ -258,12 +258,17 @@ class CreateIssuesResponse(BaseModel):
 
 
 class RepoSummary(BaseModel):
+    id: int
     full_name: str
     name: str
     owner: str
     private: bool = False
     description: str | None = None
     default_branch: str = "main"
+    language: str | None = None
+    html_url: str
+    open_issues_count: int = 0
+    updated_at: datetime | None = None
     pushed_at: datetime | None = None
 
 
@@ -271,6 +276,90 @@ class LabelSummary(BaseModel):
     name: str
     color: str = ""
     description: str | None = None
+
+
+# --------------------------------------------------------------------------
+# GitHub 이슈 / Pull Request 조회
+# --------------------------------------------------------------------------
+
+
+class GitHubUserSummary(BaseModel):
+    login: str
+    avatar_url: str | None = None
+    html_url: str | None = None
+
+
+class GitHubIssueSummary(BaseModel):
+    number: int
+    title: str
+    state: str
+    html_url: str
+    body: str | None = None
+    user: GitHubUserSummary | None = None
+    labels: list[LabelSummary] = Field(default_factory=list)
+    assignees: list[GitHubUserSummary] = Field(default_factory=list)
+    comments: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class GitHubPullRequestSummary(BaseModel):
+    number: int
+    title: str
+    state: str
+    html_url: str
+    draft: bool = False
+    user: GitHubUserSummary | None = None
+    head_ref: str
+    base_ref: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class GitHubPullRequestDetail(GitHubPullRequestSummary):
+    body: str | None = None
+    merged: bool = False
+    mergeable: bool | None = None
+    additions: int = 0
+    deletions: int = 0
+    changed_files: int = 0
+    commits: int = 0
+    comments: int = 0
+    review_comments: int = 0
+    diff_url: str | None = None
+    patch_url: str | None = None
+
+
+# --------------------------------------------------------------------------
+# Pull Request AI 리뷰
+# --------------------------------------------------------------------------
+
+
+class PullRequestReviewVerdict(StrEnum):
+    APPROVE = "approve"
+    COMMENT = "comment"
+    REQUEST_CHANGES = "request_changes"
+
+
+class PullRequestReviewFinding(BaseModel):
+    severity: FindingSeverity
+    title: str
+    message: str
+    suggestion: str = ""
+    file: str | None = None
+    line: int | None = Field(default=None, ge=1)
+
+
+class PullRequestReviewModelOutput(BaseModel):
+    verdict: PullRequestReviewVerdict
+    summary: str
+    findings: list[PullRequestReviewFinding] = Field(default_factory=list)
+
+
+class PullRequestReviewResponse(PullRequestReviewModelOutput):
+    repo: str
+    pull_number: int
+    posted_to_github: Literal[False] = False
 
 
 # --------------------------------------------------------------------------

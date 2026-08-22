@@ -33,11 +33,10 @@ export function RepoPage() {
   // 기본은 이슈 탭
   const tab = (params.get('tab') as TabId) || 'issues';
   const [q, setQ] = useState('');
-  const [showClosed, setShowClosed] = useState(false);
 
   const project = useAsync(() => projectsApi.getProject(projectId), [projectId]);
   const repo = useAsync(() => reposApi.getProjectRepo(projectId, id), [projectId, id]);
-  const issueList = useAsync(() => issuesApi.listIssues(id, showClosed ? 'all' : 'open'), [id, showClosed]);
+  const issueList = useAsync(() => issuesApi.listIssues(id, 'open'), [id]);
   const pullList = useAsync(() => pullsApi.listPulls(id), [id]);
 
   const key = q.trim().toLowerCase();
@@ -113,9 +112,6 @@ export function RepoPage() {
           <span className={s.right}>
             {tab === 'issues' && (
               <>
-                <Button size="sm" onClick={() => setShowClosed((v) => !v)}>
-                  {showClosed ? '열린 이슈만' : '닫힌 이슈도 보기'}
-                </Button>
                 <Button
                   size="sm"
                   variant="primary"
@@ -131,6 +127,25 @@ export function RepoPage() {
             )}
           </span>
         </div>
+
+        {tab === 'issues' && issueList.error && (
+          <Banner
+            tone="error"
+            title="이슈를 불러오지 못했습니다"
+            actions={<Button size="sm" onClick={issueList.reload}>다시 시도</Button>}
+          >
+            {issueList.error}
+          </Banner>
+        )}
+        {tab === 'pulls' && pullList.error && (
+          <Banner
+            tone="error"
+            title="PR을 불러오지 못했습니다"
+            actions={<Button size="sm" onClick={pullList.reload}>다시 시도</Button>}
+          >
+            {pullList.error}
+          </Banner>
+        )}
 
         {tab === 'issues' ? (
           issueList.loading ? (

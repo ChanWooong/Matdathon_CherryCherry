@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { repos as reposApi } from '../../api';
-import { Button, Checkbox, Modal, SearchInput, SkeletonRows, Tag, useToast } from '../../components/ui';
+import { Banner, Button, Checkbox, Modal, SearchInput, SkeletonRows, Tag, useToast } from '../../components/ui';
 import { useAsync } from '../../lib/useAsync';
 import { relativeTime } from '../../lib/format';
 import s from './AddReposModal.module.css';
@@ -17,7 +17,10 @@ interface Props {
 /** 레포지토리를 여러 개 골라 프로젝트에 한 번에 등록한다. */
 export function AddReposModal({ open, projectId, existing, onClose, onAdded }: Props) {
   const toast = useToast();
-  const { data, loading } = useAsync(() => (open ? reposApi.listAvailableRepos() : Promise.resolve([])), [open]);
+  const { data, loading, error, reload } = useAsync(
+    () => (open ? reposApi.listAvailableRepos() : Promise.resolve([])),
+    [open],
+  );
   const [picked, setPicked] = useState<number[]>([]);
   const [q, setQ] = useState('');
   const [saving, setSaving] = useState(false);
@@ -87,7 +90,15 @@ export function AddReposModal({ open, projectId, existing, onClose, onAdded }: P
       </div>
 
       <div className={s.scroll}>
-        {loading ? (
+        {error ? (
+          <Banner
+            tone="error"
+            title="GitHub 저장소를 불러오지 못했습니다"
+            actions={<Button size="sm" onClick={reload}>다시 시도</Button>}
+          >
+            {error}
+          </Banner>
+        ) : loading ? (
           <SkeletonRows rows={4} />
         ) : filtered.length === 0 ? (
           <div className={s.none}>검색 결과가 없습니다.</div>

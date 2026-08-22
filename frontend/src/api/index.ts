@@ -10,5 +10,5 @@ export * as meetings from './meetings';
 export * as issues from './issues';
 export * as pulls from './pulls';
 export * as agents from './agents';
-export { API_MODE, IS_MOCK } from './config';
+export { API_MODE, BYPASS_AUTH, IS_DEMO_AUTH, IS_MOCK } from './config';
 export { ApiError } from './client';

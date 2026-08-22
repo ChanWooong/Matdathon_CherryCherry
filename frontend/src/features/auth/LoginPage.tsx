@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { Button, Icon, Spinner } from '../../components/ui';
 import { useAuth } from './AuthContext';
-import { IS_MOCK } from '../../api';
+import { IS_DEMO_AUTH } from '../../api';
 import s from './LoginPage.module.css';
 
 const STEPS = [
@@ -11,8 +11,8 @@ const STEPS = [
 ];
 
 const SCOPES = [
-  ['repo', '이슈와 PR 을 읽고 씁니다'],
-  ['read:org', '소속 조직의 레포지토리 목록을 봅니다'],
+  ['local', '프로젝트와 회의록은 이 브라우저에만 보관합니다'],
+  ['server', 'GitHub 권한과 비밀값은 백엔드에서만 관리합니다'],
 ];
 
 export function LoginPage() {
@@ -58,7 +58,7 @@ export function LoginPage() {
         <div className={s.card}>
           <div className={s.cardTitle}>시작하기</div>
           <p className={s.cardDesc}>
-            GitHub 계정으로 로그인하면 접근 권한이 있는 레포지토리를 바로 가져옵니다.
+            인증 없이 로컬 데모 계정으로 시작하고, 저장소 데이터는 백엔드에서 가져옵니다.
           </p>
 
           <Button
@@ -69,7 +69,7 @@ export function LoginPage() {
             onClick={() => void signIn()}
             disabled={signingIn}
           >
-            {signingIn ? '연결하는 중…' : 'GitHub 계정으로 계속하기'}
+            {signingIn ? '준비하는 중…' : 'GitHub 데모로 계속하기'}
           </Button>
 
           <div className={s.scopes}>
@@ -82,8 +82,8 @@ export function LoginPage() {
           </div>
 
           <p className={s.fine}>
-            {IS_MOCK
-              ? '지금은 목 모드입니다. 실제 GitHub 인증 없이 데모 계정으로 들어갑니다.'
+            {IS_DEMO_AUTH
+              ? '로컬 목업 로그인입니다. 실제 인증 요청, OAuth 세션, 사용자 토큰을 만들지 않습니다.'
               : '이슈 생성은 항상 사용자가 내용을 확인하고 승인한 뒤에만 실행됩니다.'}
           </p>
         </div>

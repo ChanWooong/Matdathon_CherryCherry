@@ -44,6 +44,7 @@ export function DraftCard({ draft, onChange }: Props) {
           </div>
 
           <div className={s.meta}>
+            <Tag tone="sunk">AI 초안</Tag>
             {draft.labels.map((l) => <Tag key={l} tone="clay">{l}</Tag>)}
             <span className={[s.chip, !draft.assignee && s.missing].filter(Boolean).join(' ')}>
               <Icon name="user" size={12} />{draft.assignee ?? '담당자 미정'}

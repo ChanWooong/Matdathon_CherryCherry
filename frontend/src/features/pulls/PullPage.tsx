@@ -87,7 +87,6 @@ export function PullPage() {
   const [started, setStarted] = useState(false);
   const [comment, setComment] = useState('');
   const [edited, setEdited] = useState(false);
-  const [posting, setPosting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -128,16 +127,13 @@ export function PullPage() {
     }
   }
 
-  async function post() {
-    if (!comment.trim() || posting) return;
-    setPosting(true);
+  async function copyReview() {
+    if (!comment.trim()) return;
     try {
-      await pullsApi.postPullComment(id, num, comment);
-      toast('리뷰를 PR 에 남겼습니다', 'success');
+      await navigator.clipboard.writeText(comment);
+      toast('리뷰 초안을 클립보드에 복사했습니다', 'success');
     } catch (e) {
-      toast(e instanceof Error ? e.message : '남기지 못했습니다', 'error');
-    } finally {
-      setPosting(false);
+      toast(e instanceof Error ? e.message : '복사하지 못했습니다', 'error');
     }
   }
 
@@ -224,7 +220,7 @@ export function PullPage() {
               <Card>
                 <CardHead
                   title="리뷰 코멘트 초안"
-                  sub={running ? '작성 중' : '수정한 뒤 남길 수 있습니다'}
+                  sub={running ? '작성 중' : '검토 후 복사할 수 있습니다'}
                 />
                 <CardBody>
                   <textarea
@@ -246,10 +242,10 @@ export function PullPage() {
                       variant="primary"
                       size="sm"
                       icon="send"
-                      disabled={!comment.trim() || running || posting}
-                      onClick={() => void post()}
+                      disabled={!comment.trim() || running}
+                      onClick={() => void copyReview()}
                     >
-                      {posting ? '남기는 중…' : 'PR 에 코멘트 남기기'}
+                      클립보드에 복사
                     </Button>
                   </div>
                 </CardBody>

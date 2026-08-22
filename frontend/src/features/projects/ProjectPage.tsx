@@ -53,7 +53,7 @@ export function ProjectPage() {
     project.reload();
   }
 
-  const addMenu = (
+  const renderAddMenu = () => (
     <HoverMenu
       placement="bottomRight"
       trigger={(open) => (
@@ -80,7 +80,7 @@ export function ProjectPage() {
           eyebrow={<><Icon name="folder-open" size={13} /> 프로젝트</>}
           title={project.data?.name ?? '\u00a0'}
           desc={project.data?.description}
-          actions={addMenu}
+          actions={renderAddMenu()}
         />
 
         {project.error && <Banner tone="error">{project.error}</Banner>}
@@ -186,13 +186,13 @@ export function ProjectPage() {
           )}
         </div>
 
-        {/* 하단 회의록 추가 바 — 어느 탭에서도 바로 회의록을 남길 수 있게 둔다 */}
+        {/* 어느 탭에서도 레포지토리나 회의록을 바로 추가할 수 있는 하단 진입점 */}
         <div className={s.footBar}>
           <Icon name="quote" size={16} />
           <span className={s.footText}>
-            방금 끝난 회의가 있나요? <b>회의록을 붙여넣으면</b> 이 프로젝트에 보관되고, 이슈를 만들 때 바로 꺼내 쓸 수 있습니다.
+            프로젝트에 <b>레포지토리를 연결</b>하거나 방금 끝난 <b>회의록을 보관</b>하세요.
           </span>
-          <Button icon="plus" onClick={() => nav(`/p/${projectId}/meetings/new`)}>회의록 추가</Button>
+          {renderAddMenu()}
         </div>
       </Page>
 

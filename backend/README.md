@@ -17,7 +17,7 @@ uv pip install -e ".[dev]"
 
 # 2) 환경변수
 cp .env.example .env
-#   .env를 열어 GITHUB_TOKEN을 채운다 (스코프: repo, read:user)
+#   GITHUB_TOKEN을 채운다 (스코프: repo, read:user)
 
 # 3) 실행
 .venv/bin/uvicorn app.main:app --reload --port 8000
@@ -30,6 +30,7 @@ cp .env.example .env
 
 ```bash
 .venv/bin/pytest -q        # 네트워크 없이 전부 실행된다 (모델·GitHub 모두 모킹)
+.venv/bin/ruff check app tests
 ```
 
 ## 아키텍처
@@ -69,13 +70,16 @@ backend/
 ├── app/
 │   ├── main.py              FastAPI 앱 생성, lifespan, CORS
 │   ├── schemas.py           에이전트 간 계약 + API 모델
-│   ├── api/routes.py        SSE 분석, 이슈 생성, 이력, 리포/라벨
+│   ├── api/
+│   │   ├── routes.py        SSE 분석, 이슈 생성, 이력, 리포/라벨
+│   │   └── github_routes.py 이슈/PR 조회, 읽기 전용 AI PR 리뷰
 │   ├── agents/
 │   │   ├── prompts.py       시스템 프롬프트 + 인젝션 방어 규칙
 │   │   ├── chat_client.py   모델 공급자 (Azure OpenAI | Copilot SDK)
+│   │   ├── pr_review.py     구조화된 읽기 전용 PR 리뷰
 │   │   └── pipeline.py      3-에이전트 순차 워크플로
 │   ├── services/
-│   │   ├── github.py        이슈 생성 (부분 실패 처리), 리포/라벨 조회
+│   │   ├── github.py        이슈 생성, 리포/이슈/PR 조회
 │   │   └── history.py       분석 이력 (원문 미저장)
 │   └── core/
 │       ├── config.py        설정 + Key Vault
@@ -83,7 +87,7 @@ backend/
 ├── infra/
 │   ├── main.bicep           Container Apps + Key Vault + App Insights
 │   └── deploy.sh            반복 가능한 배포
-└── tests/                   15개 테스트, 네트워크 불필요
+└── tests/                   네트워크 불필요
 ```
 
 ## API
@@ -94,6 +98,10 @@ backend/
 | `POST` | `/api/issues` | 승인된 초안을 이슈로 생성. `approved=true` 필수 |
 | `GET` | `/api/repos` | 접근 가능한 리포 목록 |
 | `GET` | `/api/repos/{owner}/{repo}/labels` | 리포의 실제 라벨 |
+| `GET` | `/api/repos/{owner}/{repo}/issues?limit=30` | 열린 이슈 (`1..100`, PR 제외) |
+| `GET` | `/api/repos/{owner}/{repo}/pulls?limit=30` | 열린 PR |
+| `GET` | `/api/repos/{owner}/{repo}/pulls/{number}` | PR 상세 |
+| `POST` | `/api/repos/{owner}/{repo}/pulls/{number}/review` | 구조화된 AI PR 리뷰. GitHub에는 게시하지 않음 |
 | `GET` | `/api/history` | 분석 이력 목록 |
 | `GET` | `/api/history/{id}` | 이력 상세 |
 | `DELETE` | `/api/history/{id}` | 이력 삭제 |
@@ -118,6 +126,28 @@ curl -N -X POST http://localhost:8000/api/analyze \
 ```
 
 > `API_KEY`를 설정하지 않은 로컬 환경에서는 `X-API-Key` 헤더를 생략해도 된다.
+> 백엔드는 로그인·토큰 교환 엔드포인트를 제공하지 않는다. GitHub 호출에는 서버의
+> `GITHUB_TOKEN`만 사용한다.
+
+### GitHub 조회와 PR 리뷰 응답
+
+- 리포: `RepoSummary[]` — `id` (GitHub의 안정적인 numeric ID), `full_name`, `name`,
+  `owner`, `private`, `description`, `default_branch`, `language`, `html_url`,
+  `open_issues_count`, `updated_at`, `pushed_at`. GitHub 원본 필드의 의미대로
+  `open_issues_count`에는 열린 PR도 포함될 수 있다.
+- 이슈: `GitHubIssueSummary[]` — `number`, `title`, `state`, `html_url`, `body`,
+  `user`, `labels`, `assignees`, `comments`, `created_at`, `updated_at`
+- PR 목록: `GitHubPullRequestSummary[]` — `number`, `title`, `state`, `html_url`,
+  `draft`, `user`, `head_ref`, `base_ref`, `created_at`, `updated_at`
+- PR 상세: 목록 필드 + `body`, `merged`, `mergeable`, `additions`, `deletions`,
+  `changed_files`, `commits`, `comments`, `review_comments`, `diff_url`, `patch_url`
+- AI 리뷰: `{repo, pull_number, verdict, summary, findings, posted_to_github:false}`.
+  각 finding은 `{severity,title,message,suggestion,file,line}`이다. 모델 설정이 빠졌으면
+  `503`, 모델 출력 스키마가 잘못됐으면 `502`를 반환한다.
+
+PR 리뷰는 Agent Framework의 기존 `build_agent` 모델 추상화를 사용하며 diff를 읽기만 한다.
+GitHub에 POST하는 코드나 도구를 에이전트에 제공하지 않는다. `PR_REVIEW_MAX_DIFF_CHARS`
+(기본 100,000)를 넘는 diff는 잘렸다는 표식과 함께 제한된다.
 
 ## 모델 공급자
 
@@ -156,7 +186,7 @@ uv pip install -e ".[copilot]"
 | 항목 | 구현 위치 |
 |---|---|
 | 승인 게이트 | `routes.create_issues` — `approved=true`가 아니면 400. 토큰 검사보다 **먼저** 수행 |
-| 접근 제어 | `routes.require_api_key` — 서버가 **자신의** PAT로 이슈를 만들기 때문에, 인증 없이 공개하면 그 권한을 누구나 빌려 쓸 수 있다. `API_KEY` 설정 시 모든 `/api` 요청에 `X-API-Key`를 요구하고, `ENVIRONMENT=prod`인데 키가 비면 열린 채로 뜨는 대신 503으로 잠근다. (`approved` 필드는 UX 장치일 뿐, CORS는 브라우저 전용이라 둘 다 접근 통제가 아니다) |
+| 접근 제어 | `api.dependencies.require_api_key` — 서버가 **자신의** PAT로 이슈를 만들기 때문에, 인증 없이 공개하면 그 권한을 누구나 빌려 쓸 수 있다. `API_KEY` 설정 시 모든 `/api` 요청에 `X-API-Key`를 요구하고, `ENVIRONMENT=prod`인데 키가 비면 열린 채로 뜨는 대신 503으로 잠근다. (`approved` 필드는 UX 장치일 뿐, CORS는 브라우저 전용이라 둘 다 접근 통제가 아니다) |
 | AI 생성 표시 | `IssueDraft.to_github_body()` — 모든 이슈 본문 최상단에 고지 |
 | 근거 인용 | `ExtractedTask.evidence` 필수 — 근거 없는 할 일은 추출하지 않음 |
 | 프롬프트 인젝션 | `prompts.INJECTION_GUARD` + `pipeline._fence_untrusted()` — 회의록을 구분자로 격리하고 구분자 위조를 무력화 |

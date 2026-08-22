@@ -1,4 +1,4 @@
-import { API_BASE } from './config';
+import { API_KEY, API_URL } from './config';
 
 export class ApiError extends Error {
   status: number;
@@ -10,16 +10,33 @@ export class ApiError extends Error {
   }
 }
 
-/** 공용 JSON 요청. 인증 쿠키를 함께 보낸다. */
+function headers(extra?: HeadersInit): Headers {
+  const headers = new Headers(extra);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (API_KEY) headers.set('X-API-Key', API_KEY);
+  return headers;
+}
+
+async function errorMessage(res: Response): Promise<string> {
+  const text = await res.text().catch(() => '');
+  if (!text) return `${res.status} ${res.statusText}`;
+  try {
+    const parsed = JSON.parse(text) as { detail?: string };
+    return parsed.detail ?? text;
+  } catch {
+    return text;
+  }
+}
+
+/** 공용 JSON 요청. 서버 API 키가 설정된 경우 모든 요청에 포함한다. */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     ...init,
+    headers: headers(init?.headers),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new ApiError(res.status, text || `${res.status} ${res.statusText}`);
+    throw new ApiError(res.status, await errorMessage(res));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -29,21 +46,21 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * SSE(`data: {json}\n\n`) 스트림을 읽어 이벤트마다 콜백을 부른다.
  * fetch 기반이라 POST 바디를 실을 수 있고 AbortSignal 로 중단할 수 있다.
  */
-export async function streamEvents<E>(
+export async function streamEvents(
   path: string,
   body: unknown,
-  onEvent: (event: E) => void,
+  onEvent: (event: string, data: unknown) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    headers: headers({ Accept: 'text/event-stream' }),
     body: JSON.stringify(body),
     signal,
   });
   if (!res.ok || !res.body) {
-    throw new ApiError(res.status, `스트림을 열지 못했습니다 (${res.status})`);
+    throw new ApiError(res.status, await errorMessage(res));
   }
 
   const reader = res.body.getReader();
@@ -59,16 +76,14 @@ export async function streamEvents<E>(
     while (sep !== -1) {
       const chunk = buffer.slice(0, sep);
       buffer = buffer.slice(sep + 2);
+      let event = 'message';
+      const data: string[] = [];
       for (const line of chunk.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (!payload) continue;
-        try {
-          onEvent(JSON.parse(payload) as E);
-        } catch {
-          // 부분 JSON 은 무시한다
-        }
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
       }
+      const payload = data.join('\n');
+      if (payload) onEvent(event, JSON.parse(payload) as unknown);
       sep = buffer.indexOf('\n\n');
     }
   }

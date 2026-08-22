@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { HoverMenu, Icon, MenuItem, MenuSep } from '../ui';
 import { useAuth } from '../../features/auth/AuthContext';
 import { initials } from '../../lib/format';
-import { IS_MOCK } from '../../api';
+import { IS_DEMO_AUTH, IS_MOCK } from '../../api';
 import s from './Header.module.css';
 
 export interface Crumb {
@@ -36,7 +36,14 @@ export function Header({ crumbs = [] }: { crumbs?: Crumb[] }) {
       )}
 
       <div className={s.right}>
-        {IS_MOCK && <span className={s.mode} title="백엔드 없이 목 데이터로 동작 중">mock</span>}
+        {(IS_MOCK || IS_DEMO_AUTH) && (
+          <span
+            className={s.mode}
+            title={IS_MOCK ? '백엔드 없이 목 데이터로 동작 중' : '인증 요청 없는 로컬 데모 로그인'}
+          >
+            {IS_MOCK ? 'mock' : 'demo login'}
+          </span>
+        )}
         {user && (
           <HoverMenu
             placement="bottomRight"

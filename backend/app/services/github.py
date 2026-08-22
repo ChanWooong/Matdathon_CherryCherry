@@ -9,12 +9,17 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
 from app.core.config import Settings
 from app.schemas import (
     CreateIssuesResponse,
+    GitHubIssueSummary,
+    GitHubPullRequestDetail,
+    GitHubPullRequestSummary,
+    GitHubUserSummary,
     IssueCreationOutcome,
     IssueDraft,
     LabelSummary,
@@ -49,6 +54,35 @@ def _explain(response: httpx.Response) -> str:
         if isinstance(e, dict)
     ]
     return f"{message} ({'; '.join(details)})" if details else str(message)
+
+
+def _repo_path(repo: str) -> str:
+    """Validate owner/repo and encode each URL path segment independently."""
+    parts = repo.split("/")
+    if len(parts) != 2 or not all(parts):
+        raise GitHubError("repo는 'owner/repo' 형식이어야 합니다.", status=400)
+    return "/".join(quote(part, safe="") for part in parts)
+
+
+def _user_summary(data: dict[str, Any] | None) -> GitHubUserSummary | None:
+    if not data:
+        return None
+    return GitHubUserSummary(
+        login=data["login"],
+        avatar_url=data.get("avatar_url"),
+        html_url=data.get("html_url"),
+    )
+
+
+def _labels(data: list[dict[str, Any]]) -> list[LabelSummary]:
+    return [
+        LabelSummary(
+            name=item["name"],
+            color=item.get("color", ""),
+            description=item.get("description"),
+        )
+        for item in data
+    ]
 
 
 class GitHubService:
@@ -89,7 +123,10 @@ class GitHubService:
 
         if response.status_code >= 400:
             raise GitHubError(_explain(response), status=response.status_code)
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise GitHubError("GitHub 응답이 올바른 JSON이 아닙니다.") from exc
 
     # -- 공개 API ---------------------------------------------------------
 
@@ -119,12 +156,17 @@ class GitHubService:
                 owner = (item.get("owner") or {}).get("login", "")
                 repos.append(
                     RepoSummary(
+                        id=item["id"],
                         full_name=item["full_name"],
                         name=item["name"],
                         owner=owner,
                         private=item.get("private", False),
                         description=item.get("description"),
                         default_branch=item.get("default_branch") or "main",
+                        language=item.get("language"),
+                        html_url=item["html_url"],
+                        open_issues_count=item.get("open_issues_count", 0),
+                        updated_at=item.get("updated_at"),
                         pushed_at=item.get("pushed_at"),
                     )
                 )
@@ -140,24 +182,126 @@ class GitHubService:
 
         정리 에이전트가 없는 라벨을 지어내지 않도록 컨텍스트로 넘긴다.
         """
-        data = await self._get(f"/repos/{repo}/labels", per_page=100)
-        return [
-            LabelSummary(
-                name=item["name"],
-                color=item.get("color", ""),
-                description=item.get("description"),
-            )
-            for item in data
-        ]
+        data = await self._get(f"/repos/{_repo_path(repo)}/labels", per_page=100)
+        return _labels(data)
 
     async def list_assignable_users(self, repo: str) -> list[str]:
         """이슈에 할당 가능한 사용자 로그인 목록."""
         try:
-            data = await self._get(f"/repos/{repo}/assignees", per_page=100)
+            data = await self._get(f"/repos/{_repo_path(repo)}/assignees", per_page=100)
         except GitHubError as exc:
             logger.info("담당자 목록 조회 실패 (%s) — 담당자 검증을 건너뜁니다.", exc)
             return []
         return [item["login"] for item in data]
+
+    async def list_open_issues(
+        self,
+        repo: str,
+        *,
+        limit: int = 30,
+    ) -> list[GitHubIssueSummary]:
+        """Return open issues only; GitHub's issues API also returns PRs."""
+        issues: list[GitHubIssueSummary] = []
+        per_page = min(max(limit, 1), 100)
+        page = 1
+        while len(issues) < limit:
+            data = await self._get(
+                f"/repos/{_repo_path(repo)}/issues",
+                state="open",
+                sort="updated",
+                direction="desc",
+                per_page=per_page,
+                page=page,
+            )
+            issues.extend(
+                GitHubIssueSummary(
+                    number=item["number"],
+                    title=item["title"],
+                    state=item["state"],
+                    html_url=item["html_url"],
+                    body=item.get("body"),
+                    user=_user_summary(item.get("user")),
+                    labels=_labels(item.get("labels") or []),
+                    assignees=[
+                        user
+                        for assignee in item.get("assignees") or []
+                        if (user := _user_summary(assignee)) is not None
+                    ],
+                    comments=item.get("comments", 0),
+                    created_at=item["created_at"],
+                    updated_at=item["updated_at"],
+                )
+                for item in data
+                if "pull_request" not in item
+            )
+            if len(data) < per_page:
+                break
+            page += 1
+        return issues[:limit]
+
+    async def list_open_pull_requests(
+        self,
+        repo: str,
+        *,
+        limit: int = 30,
+    ) -> list[GitHubPullRequestSummary]:
+        data = await self._get(
+            f"/repos/{_repo_path(repo)}/pulls",
+            state="open",
+            sort="updated",
+            direction="desc",
+            per_page=min(max(limit, 1), 100),
+        )
+        return [self._pull_summary(item) for item in data]
+
+    @staticmethod
+    def _pull_summary(item: dict[str, Any]) -> GitHubPullRequestSummary:
+        return GitHubPullRequestSummary(
+            number=item["number"],
+            title=item["title"],
+            state=item["state"],
+            html_url=item["html_url"],
+            draft=item.get("draft", False),
+            user=_user_summary(item.get("user")),
+            head_ref=item["head"]["ref"],
+            base_ref=item["base"]["ref"],
+            created_at=item["created_at"],
+            updated_at=item["updated_at"],
+        )
+
+    async def get_pull_request(
+        self,
+        repo: str,
+        pull_number: int,
+    ) -> GitHubPullRequestDetail:
+        item = await self._get(f"/repos/{_repo_path(repo)}/pulls/{pull_number}")
+        summary = self._pull_summary(item)
+        return GitHubPullRequestDetail(
+            **summary.model_dump(),
+            body=item.get("body"),
+            merged=item.get("merged", False),
+            mergeable=item.get("mergeable"),
+            additions=item.get("additions", 0),
+            deletions=item.get("deletions", 0),
+            changed_files=item.get("changed_files", 0),
+            commits=item.get("commits", 0),
+            comments=item.get("comments", 0),
+            review_comments=item.get("review_comments", 0),
+            diff_url=item.get("diff_url"),
+            patch_url=item.get("patch_url"),
+        )
+
+    async def get_pull_diff(self, repo: str, pull_number: int) -> str:
+        try:
+            response = await self._client.get(
+                f"/repos/{_repo_path(repo)}/pulls/{pull_number}",
+                headers={"Accept": "application/vnd.github.v3.diff"},
+            )
+        except httpx.RequestError as exc:
+            raise GitHubError(f"GitHub 연결 실패: {exc}") from exc
+        if response.status_code >= 400:
+            raise GitHubError(_explain(response), status=response.status_code)
+        return response.text
 
     async def create_issue(self, repo: str, draft: IssueDraft) -> IssueCreationOutcome:
         """초안 하나를 이슈로 만든다. 실패해도 예외를 던지지 않는다."""
@@ -170,8 +314,9 @@ class GitHubService:
         if draft.assignees:
             payload["assignees"] = draft.assignees
 
+        path = f"/repos/{_repo_path(repo)}/issues"
         try:
-            response = await self._client.post(f"/repos/{repo}/issues", json=payload)
+            response = await self._client.post(path, json=payload)
         except httpx.RequestError as exc:
             return IssueCreationOutcome(
                 draft_id=draft.draft_id,
@@ -189,7 +334,7 @@ class GitHubService:
                 draft.labels or draft.assignees
             ):
                 retry = await self._client.post(
-                    f"/repos/{repo}/issues",
+                    path,
                     json={"title": payload["title"], "body": payload["body"]},
                 )
                 if retry.status_code < 400:
