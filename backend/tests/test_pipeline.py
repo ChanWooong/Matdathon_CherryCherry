@@ -230,9 +230,10 @@ def test_extraction_result_accepts_copilot_style_shapes():
 def test_coerce_accepts_composition_json_with_trailing_text():
     payload = (
         '{"draft_id":"draft-1","title":"초안","body":"본문","labels":[],'
-        '"assignees":[],"acceptance_criteria":[]}\\n'
+        '"assignees":[],"acceptance_criteria":[{"id":"AC1","description":"조건"}]}\\n'
         "모델 설명 텍스트"
     )
     result = _coerce(payload, CompositionResult)
     assert len(result.drafts) == 1
     assert result.drafts[0].title == "초안"
+    assert result.drafts[0].acceptance_criteria[0].text == "조건"
