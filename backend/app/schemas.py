@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.repo_ref import normalize_repo_ref
+
 AI_NOTICE = "🤖 AI가 생성한 초안입니다. 병합 전 반드시 검토해 주세요."
 
 
@@ -156,7 +158,10 @@ class AnalyzeRequest(BaseModel):
     transcript: str = Field(min_length=1, max_length=MAX_TRANSCRIPT_CHARS)
     repo: str | None = Field(
         default=None,
-        description="owner/repo. 지정하면 실제 라벨/멤버 목록을 컨텍스트로 넘겨준다.",
+        description=(
+            "owner/repo 또는 GitHub 링크. "
+            "지정하면 실제 라벨/멤버 목록을 컨텍스트로 넘겨준다."
+        ),
     )
     meeting_title: str | None = None
 
@@ -175,9 +180,7 @@ class AnalyzeRequest(BaseModel):
         v = v.strip()
         if not v:
             return None
-        if v.count("/") != 1 or not all(part.strip() for part in v.split("/")):
-            raise ValueError("repo는 'owner/repo' 형식이어야 합니다.")
-        return v
+        return normalize_repo_ref(v)
 
 
 class AnalysisResult(BaseModel):
@@ -208,7 +211,7 @@ class CreateIssuesRequest(BaseModel):
     `approved=True`가 아니면 서버가 거부한다 (책임 있는 AI: 승인 게이트).
     """
 
-    repo: str = Field(description="owner/repo")
+    repo: str = Field(description="owner/repo 또는 GitHub 링크")
     drafts: list[IssueDraft] = Field(min_length=1)
     approved: bool = Field(
         default=False, description="사용자가 명시적으로 승인했는가"
@@ -218,9 +221,7 @@ class CreateIssuesRequest(BaseModel):
     @field_validator("repo")
     @classmethod
     def _valid_repo(cls, v: str) -> str:
-        if v.count("/") != 1 or not all(part.strip() for part in v.split("/")):
-            raise ValueError("repo는 'owner/repo' 형식이어야 합니다.")
-        return v.strip()
+        return normalize_repo_ref(v)
 
 
 class IssueCreationOutcome(BaseModel):

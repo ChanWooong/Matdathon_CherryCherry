@@ -18,6 +18,10 @@ NOW = "2026-08-22T05:00:00Z"
 
 def test_repo_path_encodes_segments_independently():
     assert _repo_path("acme org/web#api") == "acme%20org/web%23api"
+    assert (
+        _repo_path("https://github.com/acme-org/web-app/issues/1")
+        == "acme-org/web-app"
+    )
 
 
 def _settings(tmp_path, **overrides) -> Settings:
@@ -122,6 +126,35 @@ def test_repo_summary_includes_stable_id_and_ui_metadata(tmp_path):
             "pushed_at": "2026-08-22T05:00:00Z",
         }
     ]
+
+
+@respx.mock
+def test_resolves_repository_from_github_link(tmp_path):
+    respx.get("https://api.github.com/repos/acme/web").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": 12_345,
+                "full_name": "acme/web",
+                "name": "web",
+                "owner": {"login": "acme"},
+                "private": False,
+                "description": "Web application",
+                "default_branch": "main",
+                "language": "TypeScript",
+                "html_url": "https://github.com/acme/web",
+                "open_issues_count": 8,
+                "updated_at": NOW,
+                "pushed_at": NOW,
+            },
+        )
+    )
+
+    with _client(_settings(tmp_path)) as client:
+        response = client.get("/api/repos/resolve?q=https://github.com/acme/web")
+
+    assert response.status_code == 200
+    assert response.json()["full_name"] == "acme/web"
 
 
 @respx.mock

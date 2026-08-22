@@ -1,6 +1,14 @@
 .tools { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .tools > :first-child { flex: 1; }
 
+.resolve {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  align-items: end;
+}
+
 .scroll {
   max-height: 340px;
   overflow-y: auto;

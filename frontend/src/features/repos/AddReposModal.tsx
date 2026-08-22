@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { repos as reposApi } from '../../api';
-import { Banner, Button, Checkbox, Modal, SearchInput, SkeletonRows, Tag, useToast } from '../../components/ui';
+import { Banner, Button, Checkbox, Modal, SearchInput, SkeletonRows, Tag, TextInput, useToast } from '../../components/ui';
 import { useAsync } from '../../lib/useAsync';
 import { relativeTime } from '../../lib/format';
+import type { Repo } from '../../types';
 import s from './AddReposModal.module.css';
 
 interface Props {
@@ -23,9 +24,17 @@ export function AddReposModal({ open, projectId, existing, onClose, onAdded }: P
   );
   const [picked, setPicked] = useState<number[]>([]);
   const [q, setQ] = useState('');
+  const [repoInput, setRepoInput] = useState('');
+  const [resolving, setResolving] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [extraRepos, setExtraRepos] = useState<Repo[]>([]);
 
-  const all = useMemo(() => data ?? [], [data]);
+  const all = useMemo(() => {
+    const merged = new Map<number, Repo>();
+    for (const repo of data ?? []) merged.set(repo.id, repo);
+    for (const repo of extraRepos) merged.set(repo.id, repo);
+    return [...merged.values()];
+  }, [data, extraRepos]);
   const filtered = useMemo(() => {
     const key = q.trim().toLowerCase();
     if (!key) return all;
@@ -47,7 +56,25 @@ export function AddReposModal({ open, projectId, existing, onClose, onAdded }: P
   function close() {
     setPicked([]);
     setQ('');
+    setRepoInput('');
+    setExtraRepos([]);
     onClose();
+  }
+
+  async function resolveRepoByInput() {
+    if (!repoInput.trim() || resolving) return;
+    setResolving(true);
+    try {
+      const repo = await reposApi.resolveRepo(repoInput);
+      setExtraRepos((prev) => (prev.some((item) => item.id === repo.id) ? prev : [repo, ...prev]));
+      setQ(repo.fullName);
+      if (!existing.includes(repo.id)) setPicked((prev) => (prev.includes(repo.id) ? prev : [repo.id, ...prev]));
+      toast(`${repo.fullName} 레포지토리를 찾았습니다`, 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '레포지토리를 찾지 못했습니다', 'error');
+    } finally {
+      setResolving(false);
+    }
   }
 
   async function submit() {
@@ -82,6 +109,17 @@ export function AddReposModal({ open, projectId, existing, onClose, onAdded }: P
         </>
       }
     >
+      <div className={s.resolve}>
+        <TextInput
+          placeholder="https://github.com/owner/repo 또는 owner/repo"
+          value={repoInput}
+          onChange={(e) => setRepoInput(e.target.value)}
+        />
+        <Button onClick={() => void resolveRepoByInput()} disabled={!repoInput.trim() || resolving}>
+          {resolving ? '찾는 중…' : '링크로 찾기'}
+        </Button>
+      </div>
+
       <div className={s.tools}>
         <SearchInput placeholder="레포지토리 이름으로 찾기" value={q} onChange={(e) => setQ(e.target.value)} />
         <Button size="sm" onClick={toggleAll} disabled={selectable.length === 0}>

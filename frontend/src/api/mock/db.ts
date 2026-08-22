@@ -161,6 +161,14 @@ export function saveAvailableRepos(repos: Repo[]) {
   });
 }
 
+export function upsertAvailableRepo(repo: Repo) {
+  update((db) => {
+    const index = db.availableRepos.findIndex((item) => item.id === repo.id);
+    if (index >= 0) db.availableRepos[index] = repo;
+    else db.availableRepos.unshift(repo);
+  });
+}
+
 /** 시드 이슈 + 앱에서 만든 이슈 */
 export function issuesOf(repoId: number): Issue[] {
   const db = read();
