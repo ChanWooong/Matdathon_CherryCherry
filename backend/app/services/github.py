@@ -91,10 +91,8 @@ def _labels(data: list[dict[str, Any]]) -> list[LabelSummary]:
 class GitHubService:
     """토큰 하나로 동작하는 얇은 GitHub 클라이언트."""
 
-    def __init__(self, token: str, settings: Settings | None = None) -> None:
-        if not token:
-            raise GitHubError("GitHub 토큰이 설정되지 않았습니다.", status=401)
-        self._token = token
+    def __init__(self, token: str | None, settings: Settings | None = None) -> None:
+        self._token = (token or "").strip()
         self._settings = settings
         self._client = httpx.AsyncClient(
             base_url=GITHUB_API,
@@ -106,6 +104,8 @@ class GitHubService:
                 "User-Agent": "MeetToIssue/0.1",
             },
         )
+        if not self._token:
+            self._client.headers.pop("Authorization", None)
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -115,6 +115,14 @@ class GitHubService:
 
     async def __aexit__(self, *_exc: object) -> None:
         await self.aclose()
+
+    @property
+    def has_token(self) -> bool:
+        return bool(self._token)
+
+    def _require_token(self) -> None:
+        if not self._token:
+            raise GitHubError("GitHub 토큰이 설정되지 않았습니다.", status=401)
 
     # -- 내부 -------------------------------------------------------------
 
@@ -135,11 +143,13 @@ class GitHubService:
 
     async def verify_token(self) -> str:
         """토큰이 유효한지 확인하고 로그인 아이디를 돌려준다."""
+        self._require_token()
         data = await self._get("/user")
         return data.get("login", "")
 
     async def list_repos(self, limit: int = 100) -> list[RepoSummary]:
         """사용자가 접근 가능한 리포를 최근 푸시 순으로 반환한다."""
+        self._require_token()
         repos: list[RepoSummary] = []
         page = 1
 
@@ -327,6 +337,7 @@ class GitHubService:
 
     async def create_issue(self, repo: str, draft: IssueDraft) -> IssueCreationOutcome:
         """초안 하나를 이슈로 만든다. 실패해도 예외를 던지지 않는다."""
+        self._require_token()
         payload: dict[str, Any] = {
             "title": draft.title,
             "body": draft.to_github_body(),
@@ -399,6 +410,7 @@ class GitHubService:
         GitHub의 secondary rate limit을 피하려고 동시 실행 수를 낮게 잡는다.
         하나가 실패해도 나머지는 계속 진행한다.
         """
+        self._require_token()
         semaphore = asyncio.Semaphore(max(1, concurrency))
 
         async def run(draft: IssueDraft) -> IssueCreationOutcome:

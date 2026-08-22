@@ -1,5 +1,5 @@
 import type { Repo } from '../types';
-import { request } from './client';
+import { ApiError, request } from './client';
 import { IS_MOCK, delay } from './config';
 import * as db from './mock/db';
 import { AVAILABLE_REPOS } from './mock/fixtures';
@@ -58,7 +58,15 @@ export async function listAvailableRepos(): Promise<Repo[]> {
     db.saveAvailableRepos(AVAILABLE_REPOS);
     return AVAILABLE_REPOS;
   }
-  const repos = (await request<ApiRepo[]>('/repos')).map(toRepo);
+  let raw: ApiRepo[];
+  try {
+    raw = await request<ApiRepo[]>('/repos');
+  } catch (error) {
+    // 토큰이 없는 환경에서는 전체 목록 대신 링크 검색만 사용한다.
+    if (error instanceof ApiError && error.status === 401) return [];
+    throw error;
+  }
+  const repos = raw.map(toRepo);
   db.saveAvailableRepos(repos);
   return repos;
 }

@@ -157,6 +157,43 @@ def test_resolves_repository_from_github_link(tmp_path):
     assert response.json()["full_name"] == "acme/web"
 
 
+def test_list_repos_returns_empty_without_token(tmp_path):
+    with _client(_settings(tmp_path, github_token="")) as client:
+        response = client.get("/api/repos")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@respx.mock
+def test_resolve_repo_works_without_token_for_public_repo(tmp_path):
+    respx.get("https://api.github.com/repos/acme/web").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": 12_345,
+                "full_name": "acme/web",
+                "name": "web",
+                "owner": {"login": "acme"},
+                "private": False,
+                "description": "Web application",
+                "default_branch": "main",
+                "language": "TypeScript",
+                "html_url": "https://github.com/acme/web",
+                "open_issues_count": 8,
+                "updated_at": NOW,
+                "pushed_at": NOW,
+            },
+        )
+    )
+
+    with _client(_settings(tmp_path, github_token="")) as client:
+        response = client.get("/api/repos/resolve?q=acme/web")
+
+    assert response.status_code == 200
+    assert response.json()["full_name"] == "acme/web"
+
+
 @respx.mock
 def test_lists_open_issues_and_filters_pull_requests(tmp_path):
     route = respx.get("https://api.github.com/repos/acme/web/issues").mock(

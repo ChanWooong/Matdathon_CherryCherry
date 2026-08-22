@@ -15,7 +15,7 @@ from app.agents.pipeline import (
     StageFailure,
     build_workflow,
 )
-from app.api.dependencies import get_github, require_api_key
+from app.api.dependencies import get_github_optional, require_api_key
 from app.api.github_routes import router as github_router
 from app.core.config import Settings, get_settings
 from app.schemas import (
@@ -49,7 +49,9 @@ def get_history(request: Request) -> HistoryStore:
 
 
 @router.get("/repos", response_model=list[RepoSummary])
-async def list_repos(github: GitHubService = Depends(get_github)):
+async def list_repos(github: GitHubService = Depends(get_github_optional)):
+    if not github.has_token:
+        return []
     try:
         return await github.list_repos()
     except GitHubError as exc:
@@ -59,7 +61,7 @@ async def list_repos(github: GitHubService = Depends(get_github)):
 
 
 @router.get("/repos/resolve", response_model=RepoSummary)
-async def resolve_repo(q: str, github: GitHubService = Depends(get_github)):
+async def resolve_repo(q: str, github: GitHubService = Depends(get_github_optional)):
     try:
         return await github.get_repo(q)
     except GitHubError as exc:
@@ -70,7 +72,7 @@ async def resolve_repo(q: str, github: GitHubService = Depends(get_github)):
 
 @router.get("/repos/{owner}/{repo}/labels", response_model=list[LabelSummary])
 async def list_labels(
-    owner: str, repo: str, github: GitHubService = Depends(get_github)
+    owner: str, repo: str, github: GitHubService = Depends(get_github_optional)
 ):
     try:
         return await github.list_labels(f"{owner}/{repo}")
