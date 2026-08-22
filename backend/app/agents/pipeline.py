@@ -13,6 +13,7 @@ payload를 실을 수 있는 타입은 ``"data"``뿐이므로, 실제 구분은 
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import re
@@ -35,6 +36,7 @@ from pydantic import BaseModel, ValidationError
 from app.agents.chat_client import build_agent
 from app.agents.prompts import COMPOSER_PROMPT, EXTRACTOR_PROMPT, REVIEWER_PROMPT
 from app.core.config import Settings
+from app.core.telemetry import agent_stage_span
 from app.schemas import (
     AnalysisResult,
     CompositionResult,
@@ -114,6 +116,16 @@ def _coerce(payload: str, model: type[TModel]) -> TModel:
         return model.model_validate_json(text[start : end + 1])
 
 
+async def _stop_agent(agent: SupportsAgentRun) -> None:
+    """Stop provider-owned runtimes such as the Copilot CLI child process."""
+    stop = getattr(agent, "stop", None)
+    if stop is None:
+        return
+    result = stop()
+    if inspect.isawaitable(result):
+        await result
+
+
 async def _run_stage(
     *,
     agent: SupportsAgentRun,
@@ -147,33 +159,34 @@ async def _run_stage(
         )
 
         try:
-            run_options: dict[str, Any] | None = None
-            if settings.model_provider != "copilot_sdk":
-                run_options = {"response_format": output_model}
-            stream = agent.run(
-                prompt,
-                stream=True,
-                options=run_options,
-            )
+            with agent_stage_span(stage, attempt) as span:
+                options = (
+                    {"response_format": output_model}
+                    if settings.model_provider == "azure_openai"
+                    else None
+                )
+                stream = agent.run(prompt, stream=True, options=options)
 
-            async for update in stream:
-                if isinstance(update, AgentResponseUpdate) and update.text:
-                    await ctx.add_event(
-                        WorkflowEvent(
-                            "data",
-                            data=DeltaEvent(stage=stage, text=update.text),
+                async for update in stream:
+                    if isinstance(update, AgentResponseUpdate) and update.text:
+                        await ctx.add_event(
+                            WorkflowEvent(
+                                "data",
+                                data=DeltaEvent(stage=stage, text=update.text),
+                            )
                         )
-                    )
 
-            response = await stream.get_final_response()
+                response = await stream.get_final_response()
 
-            # 공급자가 구조화 출력을 지원하면 .value가 이미 파싱된 모델이다.
-            parsed = getattr(response, "value", None)
-            result = (
-                parsed
-                if isinstance(parsed, output_model)
-                else _coerce(response.text, output_model)
-            )
+                # 공급자가 구조화 출력을 지원하면 .value가 이미 파싱된 모델이다.
+                parsed = getattr(response, "value", None)
+                result = (
+                    parsed
+                    if isinstance(parsed, output_model)
+                    else _coerce(response.text, output_model)
+                )
+                if span is not None:
+                    span.set_attribute("meettoissue.agent.status", "done")
 
             await ctx.add_event(
                 WorkflowEvent(
@@ -241,6 +254,7 @@ def _compose_prompt(state: ExtractedState) -> str:
         f"대상 리포: {state.source.repo or '(미지정)'}\n"
         f"사용 가능한 라벨: {labels}\n"
         f"할당 가능한 담당자: {assignees}\n\n"
+        "`get_repository_policy` 도구를 먼저 호출해 허용된 값을 확인한 뒤, "
         "각 할 일을 GitHub 이슈 초안으로 변환하라. "
         "위 목록에 없는 라벨이나 담당자는 절대 사용하지 마라."
     )
@@ -279,16 +293,14 @@ def build_workflow(
     """
     agents = agents or {}
 
+    extractor_owned = "extractor" not in agents
+    reviewer_owned = "reviewer" not in agents
     extractor = agents.get("extractor") or build_agent(
         name="extractor",
         instructions=EXTRACTOR_PROMPT,
         settings=settings,
     )
-    composer = agents.get("composer") or build_agent(
-        name="composer",
-        instructions=COMPOSER_PROMPT,
-        settings=settings,
-    )
+    composer = agents.get("composer")
     reviewer = agents.get("reviewer") or build_agent(
         name="reviewer",
         instructions=REVIEWER_PROMPT,
@@ -299,15 +311,19 @@ def build_workflow(
     async def extract_stage(
         inp: PipelineInput, ctx: WorkflowContext[ExtractedState]
     ) -> None:
-        extraction = await _run_stage(
-            agent=extractor,
-            prompt=_extract_prompt(inp),
-            output_model=ExtractionResult,
-            stage="extract",
-            label="회의록에서 할 일 추출",
-            ctx=ctx,
-            settings=settings,
-        )
+        try:
+            extraction = await _run_stage(
+                agent=extractor,
+                prompt=_extract_prompt(inp),
+                output_model=ExtractionResult,
+                stage="extract",
+                label="회의록에서 할 일 추출",
+                ctx=ctx,
+                settings=settings,
+            )
+        finally:
+            if extractor_owned:
+                await _stop_agent(extractor)
         await ctx.send_message(ExtractedState(source=inp, extraction=extraction))
 
     @executor(id="compose")
@@ -323,15 +339,25 @@ def build_workflow(
             )
             return
 
-        composition = await _run_stage(
-            agent=composer,
-            prompt=_compose_prompt(state),
-            output_model=CompositionResult,
-            stage="compose",
-            label="이슈 초안 작성",
-            ctx=ctx,
+        composer_agent = composer or build_agent(
+            name="composer",
+            instructions=COMPOSER_PROMPT,
             settings=settings,
+            tools=[_repository_policy_tool(state.source)],
         )
+        try:
+            composition = await _run_stage(
+                agent=composer_agent,
+                prompt=_compose_prompt(state),
+                output_model=CompositionResult,
+                stage="compose",
+                label="이슈 초안 작성",
+                ctx=ctx,
+                settings=settings,
+            )
+        finally:
+            if composer is None:
+                await _stop_agent(composer_agent)
 
         drafts = _sanitize_drafts(composition.drafts, state)
         await ctx.send_message(
@@ -346,15 +372,19 @@ def build_workflow(
     ) -> None:
         review = ReviewResult(verdict="추출된 할 일이 없어 검수를 건너뛰었습니다.")
         if state.drafts:
-            review = await _run_stage(
-                agent=reviewer,
-                prompt=_review_prompt(state),
-                output_model=ReviewResult,
-                stage="review",
-                label="초안 검수",
-                ctx=ctx,
-                settings=settings,
-            )
+            try:
+                review = await _run_stage(
+                    agent=reviewer,
+                    prompt=_review_prompt(state),
+                    output_model=ReviewResult,
+                    stage="review",
+                    label="초안 검수",
+                    ctx=ctx,
+                    settings=settings,
+                )
+            finally:
+                if reviewer_owned:
+                    await _stop_agent(reviewer)
 
         await ctx.yield_output(
             AnalysisResult(
@@ -375,6 +405,29 @@ def build_workflow(
         .add_edge(compose_stage, review_stage)
         .build()
     )
+
+
+def _repository_policy_tool(
+    context: PipelineInput | None,
+):
+    """Composer가 실제 저장소 정책을 조회하는 Agent Framework 함수 도구."""
+
+    def get_repository_policy() -> str:
+        """Return the repository name and the only allowed labels and assignees."""
+        if context is None:
+            return json.dumps(
+                {"repo": None, "allowed_labels": [], "allowed_assignees": []}
+            )
+        return json.dumps(
+            {
+                "repo": context.repo,
+                "allowed_labels": [label.name for label in context.labels],
+                "allowed_assignees": context.assignees,
+            },
+            ensure_ascii=False,
+        )
+
+    return get_repository_policy
 
 
 def _sanitize_drafts(

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.api.routes import router
 from app.core.config import Settings, get_settings
@@ -38,7 +40,9 @@ async def lifespan(app: FastAPI):
     logger.info("%s 종료", settings.app_name)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, *, static_dir: str | Path | None = None
+) -> FastAPI:
     """앱을 만든다.
 
     `settings`를 명시적으로 받는 이유: lifespan은 FastAPI의 dependency_overrides를
@@ -72,8 +76,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok",
             "environment": settings.environment,
             "provider": settings.model_provider,
+            "agent_framework": "microsoft-agent-framework",
+            "workflow": ["extract", "compose", "review"],
             "github_token_configured": bool(settings.github_token),
         }
+
+    spa_dir = Path(static_dir or "/app/static").resolve()
+    index_file = spa_dir / "index.html"
+    if index_file.is_file():
+
+        @app.get("/{path:path}", include_in_schema=False)
+        async def serve_spa(path: str):
+            """Serve built assets and fall back to the SPA for client-side routes."""
+            reserved = ("api", "health", "docs", "redoc", "openapi.json")
+            first_segment = path.split("/", 1)[0]
+            if first_segment in reserved:
+                raise HTTPException(status_code=404)
+
+            requested = (spa_dir / path).resolve()
+            if requested.is_relative_to(spa_dir) and requested.is_file():
+                return FileResponse(requested)
+            return FileResponse(index_file)
 
     return app
 

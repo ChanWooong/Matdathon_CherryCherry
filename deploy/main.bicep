@@ -1,7 +1,7 @@
-// MeetToIssue 백엔드 인프라
+// MeetToIssue 단일 컨테이너 애플리케이션 인프라
 //
 // PRD §2에 명시된 서비스만 배포한다:
-//   - Container Apps     : 백엔드 호스팅
+//   - Container Apps     : 빌드된 SPA와 FastAPI를 함께 호스팅
 //   - Key Vault          : GitHub 토큰 보관
 //   - App Insights       : 에이전트 단계별 관찰성
 //   - Log Analytics      : App Insights 백엔드 (필수 의존성)
@@ -18,24 +18,25 @@ param location string = resourceGroup().location
 
 @description('환경 구분자 (dev | prod)')
 @allowed(['dev', 'prod'])
-param environmentName string = 'dev'
+param environmentName string = 'prod'
 
-@description('배포할 컨테이너 이미지. 최초 배포 시에는 기본 헬로 이미지를 쓴다.')
+@description('배포할 컨테이너 이미지. 최초 인프라 생성 시에만 기본 헬로 이미지를 쓴다.')
 param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('컨테이너 수신 포트. 최초 bootstrap 이미지는 80, 앱 이미지는 8000.')
+param containerTargetPort int = 80
 
 @description('GitHub PAT. Key Vault에 저장되며 앱에는 참조로만 주입된다.')
 @secure()
-param githubToken string = ''
+@minLength(1)
+param githubToken string
 
-@description('API 접근 키. 비워두면 운영 환경에서 /api가 503으로 잠긴다.')
+@description('브라우저 번들과 서버가 공유하는 데모 API 접근 키. Key Vault에 보관한다.')
 @secure()
-param apiKey string = ''
+@minLength(1)
+param apiKey string
 
-@description('모델 공급자. github_models는 2026-07-30 폐지되어 선택할 수 없다.')
-@allowed(['azure_openai', 'copilot_sdk'])
-param modelProvider string = 'azure_openai'
-
-@description('추론에 사용할 모델 배포 이름')
+@description('Azure OpenAI 배포 이름. 컨테이너의 MODEL_ID에 같은 값이 주입된다.')
 param modelId string = 'gpt-4o'
 
 @description('배포할 Azure OpenAI 모델 이름/버전')
@@ -44,9 +45,6 @@ param openAiModelVersion string = '2024-11-20'
 
 @description('Azure OpenAI 배포 TPM 용량 (1,000 토큰/분 단위)')
 param openAiCapacity int = 30
-
-@description('CORS 허용 오리진 (쉼표 구분)')
-param corsOrigins string = 'http://localhost:5173'
 
 var suffix = uniqueString(resourceGroup().id)
 var resourceName = '${namePrefix}-${environmentName}'
@@ -91,7 +89,7 @@ resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' 
 // --------------------------------------------------------------------------
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: 'kv-${namePrefix}-${suffix}'
+  name: 'kv-${suffix}'
   location: location
   properties: {
     sku: { family: 'A', name: 'standard' }
@@ -103,7 +101,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-resource githubTokenSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(githubToken)) {
+resource githubTokenSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'github-token'
   properties: {
@@ -112,7 +110,7 @@ resource githubTokenSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (
 }
 
 // 앱이 기동 시 Key Vault에서 읽어 /api 요청의 X-API-Key와 대조한다.
-resource apiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(apiKey)) {
+resource apiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'api-key'
   properties: {
@@ -239,17 +237,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        // 데모 프론트엔드가 브라우저에서 직접 호출하므로 외부 공개가 필요하다.
-        // 접근 통제는 앱 계층의 X-API-Key(require_api_key)가 담당한다.
-        // CORS는 브라우저 전용이라 통제 수단이 될 수 없다.
+        // SPA와 API가 같은 공개 호스트에서 제공된다.
         external: true
-        targetPort: 8000
+        targetPort: containerTargetPort
         transport: 'auto'
-        corsPolicy: {
-          allowedOrigins: split(corsOrigins, ',')
-          allowedMethods: ['GET', 'POST', 'DELETE', 'OPTIONS']
-          allowedHeaders: ['*']
-        }
       }
       registries: [
         {
@@ -269,11 +260,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             { name: 'ENVIRONMENT', value: environmentName }
-            { name: 'MODEL_PROVIDER', value: modelProvider }
+            // Copilot SDK는 로컬 코드 평가 경로다. Azure는 비대화형 관리 ID를 사용한다.
+            { name: 'MODEL_PROVIDER', value: 'azure_openai' }
             { name: 'MODEL_ID', value: modelId }
             { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.properties.endpoint }
             { name: 'AZURE_OPENAI_API_VERSION', value: '2024-10-21' }
-            { name: 'CORS_ORIGINS', value: corsOrigins }
             { name: 'AZURE_KEY_VAULT_URL', value: keyVault.properties.vaultUri }
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
             {
@@ -284,13 +275,19 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           probes: [
             {
               type: 'Liveness'
-              httpGet: { path: '/health', port: 8000 }
+              httpGet: {
+                path: containerTargetPort == 8000 ? '/health' : '/'
+                port: containerTargetPort
+              }
               initialDelaySeconds: 10
               periodSeconds: 30
             }
             {
               type: 'Readiness'
-              httpGet: { path: '/health', port: 8000 }
+              httpGet: {
+                path: containerTargetPort == 8000 ? '/health' : '/'
+                port: containerTargetPort
+              }
               initialDelaySeconds: 5
               periodSeconds: 10
             }
@@ -325,8 +322,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 // --------------------------------------------------------------------------
 
 output openAiEndpoint string = openAi.properties.endpoint
-output apiUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
+output openAiDeploymentName string = openAiDeployment.name
+output appUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
+output apiBaseUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}/api'
+output healthUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}/health'
 output registryLoginServer string = registry.properties.loginServer
+output registryName string = registry.name
 output keyVaultName string = keyVault.name
 output containerAppName string = containerApp.name
 output appInsightsName string = appInsights.name

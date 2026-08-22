@@ -1,17 +1,14 @@
 """모델 연결 계층.
 
-세 가지 공급자를 지원한다.
+두 가지 공급자를 지원한다.
 
-- ``azure_openai`` (기본): Azure OpenAI / Azure AI Foundry 배포. API 키 또는
+- ``copilot_sdk`` (로컬 기본): ``agent-framework-github-copilot`` 패키지의
+  ``GitHubCopilotAgent``로 Copilot CLI 런타임을 제어한다.
+- ``azure_openai`` (Azure 배포): Azure OpenAI / Azure AI Foundry 배포. API 키 또는
   관리 ID(``DefaultAzureCredential``)로 인증한다. 구조화 출력(response_format)이
   안정적이라 서버 파이프라인에 적합하다.
-- ``copilot_sdk``: ``agent-framework-github-copilot`` 패키지가 제공하는
-  ``GitHubCopilotAgent``. GitHub Copilot SDK(JSON-RPC로 Copilot CLI 제어)를
-  그대로 사용한다.
-- ``github_models``: **2026-07-30 폐지됨.** 엔드포인트가 HTTP 410을 반환하므로
-  신규 사용 불가. 과거 설정과의 호환을 위해서만 남겨두고, 선택 시 경고한다.
 
-세 경로 모두 Microsoft Agent Framework의 ``SupportsAgentRun`` 계약을 만족하므로
+두 경로 모두 Microsoft Agent Framework의 ``SupportsAgentRun`` 계약을 만족하므로
 오케스트레이터는 어느 쪽인지 알 필요가 없다.
 """
 
@@ -70,30 +67,6 @@ def _build_azure_openai_client(
     return OpenAIChatCompletionClient(**kwargs)
 
 
-def _build_github_models_client(
-    settings: Settings, model: str | None = None
-) -> OpenAIChatCompletionClient:
-    """GitHub Models 엔드포인트에 연결된 Chat Completions 클라이언트.
-
-    Responses API가 아닌 Chat Completions API를 쓰는 이유는
-    GitHub Models가 후자만 OpenAI 호환으로 제공하기 때문이다.
-    """
-    logger.warning(
-        "MODEL_PROVIDER=github_models는 2026-07-30에 폐지되어 HTTP 410을 반환합니다. "
-        "MODEL_PROVIDER=azure_openai 또는 copilot_sdk로 이전하세요."
-    )
-    if not settings.github_token:
-        raise ModelConfigurationError(
-            "GITHUB_TOKEN이 필요합니다. GitHub Models 추론과 이슈 생성에 모두 사용됩니다."
-        )
-
-    return OpenAIChatCompletionClient(
-        model=model or settings.model_id,
-        api_key=settings.github_token,
-        base_url=settings.model_base_url,
-    )
-
-
 def build_agent(
     *,
     name: str,
@@ -119,17 +92,15 @@ def build_agent(
             instructions,
             name=name,
             tools=tools or None,
+            default_options={"model": model or settings.model_id},
         )
 
-    if provider == "azure_openai":
-        client = _build_azure_openai_client(settings, model)
-    elif provider == "github_models":
-        client = _build_github_models_client(settings, model)
-    else:
+    if provider != "azure_openai":
         raise ModelConfigurationError(
             f"알 수 없는 MODEL_PROVIDER: {provider!r} "
-            "(azure_openai, copilot_sdk, github_models 중 하나여야 합니다)"
+            "(copilot_sdk 또는 azure_openai여야 합니다)"
         )
+    client = _build_azure_openai_client(settings, model)
 
     return Agent(
         client=client,

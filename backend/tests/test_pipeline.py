@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.agents.pipeline import PipelineInput, StageFailure, build_workflow
+from app.agents.pipeline import (
+    PipelineInput,
+    StageFailure,
+    _repository_policy_tool,
+    build_workflow,
+)
 from app.core.config import Settings
 from app.schemas import (
     AnalysisResult,
@@ -169,6 +174,16 @@ async def test_pipeline_skips_downstream_when_no_tasks():
     assert result.findings == []
     # 정리/검수 에이전트는 호출되지 않아야 한다.
     assert {s.stage for s in stages} == {"extract"}
+
+
+def test_repository_policy_tool_exposes_only_server_verified_values():
+    tool = _repository_policy_tool(_pipeline_input())
+
+    assert tool.__name__ == "get_repository_policy"
+    assert tool() == (
+        '{"repo": "acme/web", "allowed_labels": ["bug", "p0"], '
+        '"allowed_assignees": ["chanwoong"]}'
+    )
 
 
 def test_extraction_result_accepts_title_alias_for_decisions():
