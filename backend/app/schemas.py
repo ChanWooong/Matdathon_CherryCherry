@@ -22,7 +22,7 @@ class Decision(BaseModel):
     """회의에서 확정된 결정사항."""
 
     statement: str = Field(
-        validation_alias=AliasChoices("statement", "title"),
+        validation_alias=AliasChoices("statement", "title", "decision"),
         description="결정된 내용 한 문장",
     )
     evidence: str = Field(
