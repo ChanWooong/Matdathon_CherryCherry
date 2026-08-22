@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,19 @@ class Settings(BaseSettings):
     @property
     def telemetry_enabled(self) -> bool:
         return bool(self.applicationinsights_connection_string)
+
+    @model_validator(mode="after")
+    def _validate_runtime_model_provider(self) -> Settings:
+        # 배포 환경에서는 비대화형/관리 ID 경로인 Azure OpenAI만 허용한다.
+        if self.is_production and self.model_provider != "azure_openai":
+            raise ValueError(
+                "ENVIRONMENT=prod에서는 MODEL_PROVIDER=azure_openai를 사용해야 합니다."
+            )
+        if self.is_production and not self.azure_openai_endpoint.strip():
+            raise ValueError(
+                "ENVIRONMENT=prod에서는 AZURE_OPENAI_ENDPOINT가 필요합니다."
+            )
+        return self
 
 
 def _load_secrets_from_key_vault(settings: Settings) -> None:

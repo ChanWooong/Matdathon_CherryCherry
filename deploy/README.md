@@ -22,6 +22,10 @@ The Azure container always receives:
 - `AZURE_KEY_VAULT_URL` and `AZURE_CLIENT_ID`
 - `APPLICATIONINSIGHTS_CONNECTION_STRING` and `ENVIRONMENT`
 
+The backend now enforces this split at runtime: in `ENVIRONMENT=prod`, startup
+fails fast unless `MODEL_PROVIDER=azure_openai` and `AZURE_OPENAI_ENDPOINT` are
+set. This prevents accidental production boot with local `copilot_sdk` config.
+
 Azure OpenAI uses managed identity; no OpenAI API key is created or preferred.
 The image does not install or run Copilot CLI. Local/code evaluation may default
 to `MODEL_PROVIDER=copilot_sdk` and `MODEL_ID=gpt-5-mini`, but those settings
