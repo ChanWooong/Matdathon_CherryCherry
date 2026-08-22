@@ -1,6 +1,6 @@
 import type { User } from '../types';
 import { request } from './client';
-import { IS_MOCK, delay } from './config';
+import { BYPASS_AUTH, IS_MOCK, delay } from './config';
 import * as db from './mock/db';
 import { DEMO_USER } from './mock/fixtures';
 
@@ -10,6 +10,7 @@ export async function getMe(): Promise<User | null> {
     await delay(120);
     return db.get().user;
   }
+  if (BYPASS_AUTH) return DEMO_USER;
   try {
     return await request<User>('/auth/me');
   } catch {
@@ -26,6 +27,7 @@ export async function signInWithGitHub(): Promise<User> {
       return s.user;
     });
   }
+  if (BYPASS_AUTH) return DEMO_USER;
   window.location.href = '/api/auth/github';
   return new Promise<User>(() => {});
 }
@@ -35,5 +37,6 @@ export async function signOut(): Promise<void> {
     db.update((s) => { s.user = null; });
     return;
   }
+  if (BYPASS_AUTH) return;
   await request<void>('/auth/logout', { method: 'POST' });
 }

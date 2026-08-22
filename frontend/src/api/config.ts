@@ -7,6 +7,7 @@
 export const API_MODE = (import.meta.env.VITE_API_MODE ?? 'mock') as 'mock' | 'live';
 export const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
 export const IS_MOCK = API_MODE === 'mock';
+export const BYPASS_AUTH = (import.meta.env.VITE_DEMO_BYPASS_AUTH ?? 'false') === 'true';
 
 /** 목 모드에서 네트워크 지연을 흉내낸다. */
 export function delay(ms: number) {

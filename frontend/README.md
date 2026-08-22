@@ -21,12 +21,19 @@ npm run dev     # http://localhost:5173
 ## 백엔드 연결
 
 ```bash
-cp .env.example .env    # VITE_API_MODE=live, VITE_API_BASE=http://localhost:8000
+cp .env.example .env
+# 채점/데모 권장값
+# VITE_API_MODE=live
+# VITE_DEMO_BYPASS_AUTH=true
+# VITE_API_BASE=/api
 npm run dev
 ```
 
 `src/api/*.ts` 의 각 함수는 앞부분에서 mock 을 처리하고 뒤에서 실제 요청을 보냅니다.
 백엔드가 붙으면 **화면 코드는 한 줄도 바뀌지 않습니다.**
+
+`VITE_DEMO_BYPASS_AUTH=true` 일 때는 OAuth 없이 데모 사용자로 자동 로그인되어,
+인증 이슈 없이도 live 백엔드 API 연결 시연이 가능합니다.
 
 ---
 
