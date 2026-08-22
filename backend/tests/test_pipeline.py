@@ -200,3 +200,26 @@ def test_extraction_result_accepts_title_and_decision_aliases_for_decisions():
     )
     assert result.decisions[0].statement == "배포 순서 프로덕션으로 정함"
     assert result.decisions[1].statement == "SSE 30초 타임아웃으로 확정"
+
+
+def test_extraction_result_accepts_copilot_style_shapes():
+    result = ExtractionResult.model_validate(
+        {
+            "summary": [
+                "로그인 토큰 만료 이슈를 논의했다.",
+                "SSE keep-alive 핑 추가를 합의했다.",
+            ],
+            "decisions": [{"decision": "배포는 스테이징 검증 후 프로덕션"}],
+            "tasks": [
+                {"task": "로그인 토큰 만료 처리", "owner": "민지"},
+                {"task": "SSE 연결 안정화", "deadline": "다음 주"},
+            ],
+            "open_questions": [{"question": "온보딩 문서 범위 확정 필요"}],
+        }
+    )
+    assert "로그인 토큰 만료" in result.summary
+    assert result.decisions[0].statement.startswith("배포는")
+    assert result.tasks[0].title == "로그인 토큰 만료 처리"
+    assert result.tasks[0].assignee == "민지"
+    assert result.tasks[1].due == "다음 주"
+    assert result.open_questions == ["온보딩 문서 범위 확정 필요"]

@@ -410,6 +410,8 @@ def test_production_without_api_key_is_locked(tmp_path):
         github_token="test-token",
         history_db_path=str(tmp_path / "h.db"),
         environment="prod",
+        model_provider="azure_openai",
+        azure_openai_endpoint="https://example.openai.azure.com/",
         api_key="",
     )
     with _client_with(settings) as client:

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 
 from app.core.repo_ref import normalize_repo_ref
 
@@ -31,26 +31,48 @@ class Decision(BaseModel):
         description="회의록 원문에서 그대로 인용한 근거 문장",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_string(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"statement": value}
+        return value
+
 
 class ExtractedTask(BaseModel):
     """회의록에서 추출한 할 일 하나."""
 
-    title: str = Field(description="할 일을 요약한 한 문장")
+    title: str = Field(
+        validation_alias=AliasChoices("title", "task", "item"),
+        description="할 일을 요약한 한 문장",
+    )
     detail: str = Field(
         default="",
         validation_alias=AliasChoices("detail", "description", "context"),
         description="맥락 및 배경 설명",
     )
     assignee: str | None = Field(
-        default=None, description="회의록에 명시된 담당자. 불명확하면 null"
+        default=None,
+        validation_alias=AliasChoices("assignee", "owner", "person", "who"),
+        description="회의록에 명시된 담당자. 불명확하면 null",
     )
     due: str | None = Field(
-        default=None, description="기한. 회의록 표현 그대로(예: '다음 주 금요일'). 없으면 null"
+        default=None,
+        validation_alias=AliasChoices("due", "deadline", "due_date"),
+        description="기한. 회의록 표현 그대로(예: '다음 주 금요일'). 없으면 null",
     )
     evidence: str = Field(
         default="",
+        validation_alias=AliasChoices("evidence", "quote", "source"),
         description="이 할 일의 근거가 되는 회의록 원문 인용 (환각 완화용)"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_string(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"title": value}
+        return value
 
 
 class ExtractionResult(BaseModel):
@@ -62,6 +84,38 @@ class ExtractionResult(BaseModel):
     open_questions: list[str] = Field(
         default_factory=list, description="회의에서 결론나지 않은 논점"
     )
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def _coerce_summary(cls, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            return "\n".join(str(item) for item in value if str(item).strip())
+        if isinstance(value, dict):
+            return str(value.get("summary") or value.get("text") or "")
+        return str(value)
+
+    @field_validator("open_questions", mode="before")
+    @classmethod
+    def _coerce_open_questions(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        if not isinstance(value, list):
+            return []
+        normalized: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                text = item.strip()
+            elif isinstance(item, dict):
+                text = str(item.get("question") or item.get("text") or "").strip()
+            else:
+                text = str(item).strip()
+            if text:
+                normalized.append(text)
+        return normalized
 
 
 # --------------------------------------------------------------------------
