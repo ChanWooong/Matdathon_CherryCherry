@@ -45,6 +45,12 @@ function toRepo(repo: ApiRepo): Repo {
   };
 }
 
+function normalizeRepoQuery(input: string): string {
+  const value = input.trim();
+  if (!value) throw new Error('GitHub 링크 또는 owner/repo를 입력해 주세요.');
+  return value;
+}
+
 /** GitHub 계정에서 접근할 수 있는 레포지토리. */
 export async function listAvailableRepos(): Promise<Repo[]> {
   if (IS_MOCK) {
@@ -55,6 +61,30 @@ export async function listAvailableRepos(): Promise<Repo[]> {
   const repos = (await request<ApiRepo[]>('/repos')).map(toRepo);
   db.saveAvailableRepos(repos);
   return repos;
+}
+
+/** GitHub 링크(owner/repo 포함)로 특정 레포지토리를 조회한다. */
+export async function resolveRepo(input: string): Promise<Repo> {
+  const query = normalizeRepoQuery(input);
+  if (IS_MOCK) {
+    await delay(120);
+    const key = query
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/\/+$/, '')
+      .split('/')
+      .slice(0, 2)
+      .join('/')
+      .replace(/\.git$/i, '');
+    const found = db.get().availableRepos.find((repo) => repo.fullName.toLowerCase() === key.toLowerCase());
+    if (!found) throw new Error('해당 링크의 레포지토리를 찾지 못했습니다.');
+    return found;
+  }
+
+  const resolved = toRepo(
+    await request<ApiRepo>(`/repos/resolve?q=${encodeURIComponent(query)}`),
+  );
+  db.upsertAvailableRepo(resolved);
+  return resolved;
 }
 
 /** 프로젝트 구성은 MVP에서 브라우저에 저장하고 GitHub 데이터만 서버에서 가져온다. */

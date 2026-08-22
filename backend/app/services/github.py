@@ -14,6 +14,7 @@ from urllib.parse import quote
 import httpx
 
 from app.core.config import Settings
+from app.core.repo_ref import normalize_repo_ref
 from app.schemas import (
     CreateIssuesResponse,
     GitHubIssueSummary,
@@ -58,9 +59,11 @@ def _explain(response: httpx.Response) -> str:
 
 def _repo_path(repo: str) -> str:
     """Validate owner/repo and encode each URL path segment independently."""
-    parts = repo.split("/")
-    if len(parts) != 2 or not all(parts):
-        raise GitHubError("repo는 'owner/repo' 형식이어야 합니다.", status=400)
+    try:
+        normalized = normalize_repo_ref(repo)
+    except ValueError as exc:
+        raise GitHubError(str(exc), status=400) from exc
+    parts = normalized.split("/")
     return "/".join(quote(part, safe="") for part in parts)
 
 
@@ -176,6 +179,25 @@ class GitHubService:
             page += 1
 
         return repos[:limit]
+
+    async def get_repo(self, repo: str) -> RepoSummary:
+        """owner/repo 또는 GitHub URL로 특정 리포 하나를 조회한다."""
+        item = await self._get(f"/repos/{_repo_path(repo)}")
+        owner = (item.get("owner") or {}).get("login", "")
+        return RepoSummary(
+            id=item["id"],
+            full_name=item["full_name"],
+            name=item["name"],
+            owner=owner,
+            private=item.get("private", False),
+            description=item.get("description"),
+            default_branch=item.get("default_branch") or "main",
+            language=item.get("language"),
+            html_url=item["html_url"],
+            open_issues_count=item.get("open_issues_count", 0),
+            updated_at=item.get("updated_at"),
+            pushed_at=item.get("pushed_at"),
+        )
 
     async def list_labels(self, repo: str) -> list[LabelSummary]:
         """리포에 실제로 존재하는 라벨 목록.

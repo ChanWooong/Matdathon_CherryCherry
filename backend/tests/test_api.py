@@ -134,6 +134,25 @@ def test_analyze_rejects_bad_repo_format(client):
     assert response.status_code == 422
 
 
+@respx.mock
+def test_analyze_accepts_github_repo_url(client):
+    respx.get("https://api.github.com/repos/acme/web/labels").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+    respx.get("https://api.github.com/repos/acme/web/assignees").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+
+    response = client.post(
+        "/api/analyze",
+        json={
+            "transcript": "내용",
+            "repo": "https://github.com/acme/web/issues/12",
+        },
+    )
+    assert response.status_code == 200
+
+
 def _draft(draft_id="draft-1", title="테스트 이슈"):
     return {
         "draft_id": draft_id,

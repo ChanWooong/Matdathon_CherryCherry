@@ -58,6 +58,16 @@ async def list_repos(github: GitHubService = Depends(get_github)):
         await github.aclose()
 
 
+@router.get("/repos/resolve", response_model=RepoSummary)
+async def resolve_repo(q: str, github: GitHubService = Depends(get_github)):
+    try:
+        return await github.get_repo(q)
+    except GitHubError as exc:
+        raise HTTPException(status_code=exc.status or 502, detail=str(exc)) from exc
+    finally:
+        await github.aclose()
+
+
 @router.get("/repos/{owner}/{repo}/labels", response_model=list[LabelSummary])
 async def list_labels(
     owner: str, repo: str, github: GitHubService = Depends(get_github)
