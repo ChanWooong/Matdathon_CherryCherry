@@ -1,0 +1,37 @@
+.editor { display: grid; gap: var(--sp-4); }
+
+.titleInput input,
+.titleInput {
+  font-family: var(--font-serif);
+}
+
+.area {
+  min-height: 46vh;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+}
+.stat { font-family: var(--font-mono); font-size: var(--text-xs); }
+.spacer { margin-left: auto; display: flex; gap: var(--sp-2); }
+
+.tip {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--paper-sunk);
+  border-radius: var(--r-md);
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+  line-height: 1.85;
+}
+.tip code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 1px 4px;
+}
