@@ -110,10 +110,22 @@ def _coerce(payload: str, model: type[TModel]) -> TModel:
     try:
         return model.model_validate_json(text)
     except ValidationError:
+        # Copilot SDK 출력은 유효 JSON 뒤에 설명 텍스트가 붙을 수 있다.
+        decoder = json.JSONDecoder()
+        try:
+            parsed, _ = decoder.raw_decode(text)
+            return model.model_validate(parsed)
+        except ValueError:
+            pass
         start, end = text.find("{"), text.rfind("}")
         if start == -1 or end <= start:
             raise
-        return model.model_validate_json(text[start : end + 1])
+        clipped = text[start : end + 1]
+        try:
+            return model.model_validate_json(clipped)
+        except ValidationError:
+            parsed, _ = decoder.raw_decode(clipped)
+            return model.model_validate(parsed)
 
 
 async def _stop_agent(agent: SupportsAgentRun) -> None:
