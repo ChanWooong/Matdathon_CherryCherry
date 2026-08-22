@@ -136,14 +136,33 @@ class AcceptanceCriterion(BaseModel):
         description="객관적으로 검증 가능한 완료 조건",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_string(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"id": "AC", "text": value}
+        return value
+
 
 class IssueDraft(BaseModel):
     """GitHub 이슈 초안 하나. 사용자가 카드 UI에서 수정/제외/승인한다."""
 
-    draft_id: str = Field(description="프론트엔드에서 카드를 식별하는 안정적인 ID")
+    draft_id: str = Field(
+        validation_alias=AliasChoices("draft_id", "id"),
+        description="프론트엔드에서 카드를 식별하는 안정적인 ID",
+    )
     title: str = Field(description="이슈 제목 (동사로 시작, 60자 이내 권장)")
-    body: str = Field(description="이슈 본문 마크다운 (AI 고지 제외 — 생성 시 자동 첨부)")
-    acceptance_criteria: list[AcceptanceCriterion] = Field(default_factory=list)
+    body: str = Field(
+        default="",
+        validation_alias=AliasChoices("body", "description", "content"),
+        description="이슈 본문 마크다운 (AI 고지 제외 — 생성 시 자동 첨부)",
+    )
+    acceptance_criteria: list[AcceptanceCriterion] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices(
+            "acceptance_criteria", "acceptanceCriteria", "ac", "criteria"
+        ),
+    )
     labels: list[str] = Field(
         default_factory=list, description="리포에 실제로 존재하는 라벨만 사용"
     )
@@ -152,6 +171,35 @@ class IssueDraft(BaseModel):
     source_task_title: str = Field(
         default="", description="이 초안이 유래한 ExtractedTask.title"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_compose_shapes(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"draft_id": "draft-1", "title": value, "body": ""}
+        if not isinstance(value, dict):
+            return value
+
+        normalized = dict(value)
+        labels = normalized.get("labels")
+        if isinstance(labels, list):
+            normalized["labels"] = [
+                item["name"] if isinstance(item, dict) and "name" in item else str(item)
+                for item in labels
+            ]
+
+        assignees = normalized.get("assignees")
+        if isinstance(assignees, str):
+            normalized["assignees"] = [assignees]
+        elif isinstance(assignees, list):
+            normalized["assignees"] = [
+                item.get("login") or item.get("name") or str(item)
+                if isinstance(item, dict)
+                else str(item)
+                for item in assignees
+            ]
+
+        return normalized
 
     def to_github_body(self) -> str:
         """AI 고지 + AC 체크리스트를 붙여 실제 게시할 이슈 본문을 만든다."""
