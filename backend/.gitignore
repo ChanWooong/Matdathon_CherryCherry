@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# 비밀 정보 — 절대 커밋 금지
+.env
+.env.local
+*.pem
+
+# 런타임 데이터 (회의 이력 DB)
+data/
+
+# 에디터
+.DS_Store
+.vscode/
+.idea/
