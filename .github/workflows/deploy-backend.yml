@@ -1,0 +1,62 @@
+name: Deploy backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+      resource_group:
+        description: "Azure resource group"
+        required: false
+        default: "rg-meettoissue-dev"
+      location:
+        description: "Azure region"
+        required: false
+        default: "koreacentral"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment || vars.BACKEND_ENVIRONMENT || 'dev' }}
+      IMAGE_TAG: ${{ github.sha }}
+      GITHUB_TOKEN: ${{ secrets.BACKEND_GITHUB_TOKEN }}
+      API_KEY: ${{ secrets.BACKEND_API_KEY }}
+      RESOURCE_GROUP: ${{ github.event.inputs.resource_group || vars.BACKEND_RESOURCE_GROUP || 'rg-meettoissue-dev' }}
+      LOCATION: ${{ github.event.inputs.location || vars.BACKEND_LOCATION || 'koreacentral' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy backend infra and app
+        run: |
+          chmod +x infra/deploy.sh
+          ./infra/deploy.sh "$RESOURCE_GROUP" "$LOCATION"

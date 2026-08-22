@@ -214,3 +214,20 @@ export GITHUB_TOKEN=ghp_...
 - `minReplicas: 1` — 데모 중 콜드 스타트 방지
 - `/health` 라이브니스·레디니스 프로브
 - App Insights로 단계별 소요 시간·실패율 추적
+
+### GitHub Actions 자동 배포
+
+`main`에 `backend/**` 변경이 푸시되면 `.github/workflows/deploy-backend.yml`이 자동으로 배포를 수행합니다.
+수동 배포도 Actions 탭에서 `Deploy backend`를 실행하면 됩니다.
+
+필요한 저장소 시크릿:
+
+- `AZURE_CREDENTIALS`: `azure/login@v2`용 서비스 프린시펄 JSON
+- `BACKEND_GITHUB_TOKEN`: 서버가 이슈 생성에 사용할 PAT (`repo`, `read:user`)
+- `BACKEND_API_KEY`: `/api` 보호용 키 (프론트 `VITE_API_KEY`와 동일 값)
+
+선택 저장소 변수(없으면 workflow 기본값 사용):
+
+- `BACKEND_ENVIRONMENT` (기본 `dev`)
+- `BACKEND_RESOURCE_GROUP` (기본 `rg-meettoissue-dev`)
+- `BACKEND_LOCATION` (기본 `koreacentral`)
