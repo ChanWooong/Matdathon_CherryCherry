@@ -3,10 +3,29 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
 
 from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def agent_stage_span(stage: str, attempt: int) -> Iterator[Any | None]:
+    """Create an App Insights/OpenTelemetry span for one Agent Framework stage."""
+    try:
+        from opentelemetry import trace
+    except ImportError:
+        yield None
+        return
+
+    tracer = trace.get_tracer("meettoissue.agents")
+    with tracer.start_as_current_span(f"agent.{stage}") as span:
+        span.set_attribute("meettoissue.agent.stage", stage)
+        span.set_attribute("meettoissue.agent.attempt", attempt)
+        yield span
 
 
 def configure_logging(settings: Settings) -> None:

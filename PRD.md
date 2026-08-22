@@ -29,17 +29,17 @@
 |---|---|---|
 | 백엔드 | **Python 3.12 + FastAPI** | `backend/` 디렉터리. SSE 스트리밍, Pydantic 구조화 출력 |
 | 에이전트 | `agent-framework-core` + `agent-framework-orchestrations` | `WorkflowBuilder` 순차 오케스트레이션 |
-| 모델 연결 | `MODEL_PROVIDER` 설정으로 전환 | `azure_openai`(기본) / `copilot_sdk` |
+| 모델 연결 | `MODEL_PROVIDER` 설정으로 전환 | `copilot_sdk`(로컬·코드 평가 기본) / `azure_openai`(Azure 배포) |
 | GitHub 연동 | `httpx` 비동기 클라이언트 | 리포·라벨 조회, 이슈 일괄 생성 |
 | 이력 | SQLite | 요약만 저장, 원문 미저장 |
 | 프론트 | 반응형 웹 (별도 작업) | SSE 소비 |
 | 패키지 관리 | `uv` | |
 
-> **모델 공급자 이중화**: `github-copilot-sdk`는 Copilot CLI를 JSON-RPC로 제어하는
-> 에이전트 SDK라 서버 파이프라인에는 제약이 있다. 그래서 기본값은 구조화 출력이
-> 안정적인 Azure OpenAI(`agent-framework-openai`의 `OpenAIChatCompletionClient` +
-> `azure_endpoint`)로 두고, `copilot_sdk` 경로도 함께 제공한다. 두 경로 모두
-> Agent Framework의 `SupportsAgentRun` 계약을 만족하므로 오케스트레이터 코드는 동일하다.
+> **모델 공급자 이중화**: 로컬·코드 평가 기본값은 Copilot CLI를 JSON-RPC로 제어하는
+> `copilot_sdk`이며, 실제 배포에서는 비대화형 실행과 관리 ID 인증에 적합한 Azure
+> OpenAI(`agent-framework-openai`의 `OpenAIChatCompletionClient` + `azure_endpoint`)를
+> 명시한다. 두 경로 모두 Agent Framework의 `SupportsAgentRun` 계약을 만족하므로
+> 오케스트레이터 코드는 동일하다.
 >
 > **GitHub Models 폐지 대응**: 초안에서는 GitHub Models를 기본 공급자로 잡았으나,
 > 실제 호출 검증 중 `410 github_models_retirement_brownout`을 확인했다.
@@ -152,7 +152,7 @@
 | 성능 | 회의록 2,000자 기준 분석 완료 60초 이내, 첫 토큰 3초 이내 표시 |
 | 플랫폼 | 반응형 웹 (데스크톱/모바일) |
 | 오류 처리 | 에이전트 실패 시 단계별 재시도(기본 2회), 이슈 생성 부분 실패 시 성공/실패 구분 표시, 라벨 오류 시 라벨 없이 재시도 |
-| 배포 | Bicep + `deploy.sh`로 반복 가능한 배포, 리포에 IaC 포함 (`backend/infra/`) |
+| 배포 | Bicep + `deploy.sh`로 반복 가능한 배포, 필요한 파일은 루트 `deploy/`에서 패키징 |
 | 관찰성 | App Insights로 에이전트 단계별 소요 시간·실패율 추적 |
 
 ## 7. 책임 있는 AI / 보안

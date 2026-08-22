@@ -2,7 +2,8 @@
 
 회의록을 GitHub 이슈 초안으로 바꾸는 **3-에이전트 파이프라인** FastAPI 백엔드.
 
-- **Azure OpenAI / GitHub Copilot SDK** — 에이전트 모델 연결
+- **GitHub Copilot SDK** — 로컬·코드 평가 기본 모델 런타임
+- **Azure OpenAI** — Azure Container Apps 배포용 관리 ID 런타임
 - **Microsoft Agent Framework** — 에이전트 설계, 순차 오케스트레이션, 스트리밍
 - **Azure** — Container Apps 배포, Key Vault 비밀 관리, App Insights 관찰성
 
@@ -13,7 +14,8 @@ cd backend
 
 # 1) 가상환경 + 의존성
 uv venv --python 3.12
-uv pip install -e ".[dev]"
+uv pip install -e ".[dev,copilot]"
+.venv/bin/python -m copilot download-runtime
 
 # 2) 환경변수
 cp .env.example .env
@@ -63,6 +65,17 @@ ExtractionResult → CompositionResult → ReviewResult
 각 단계의 출력이 다음 단계의 입력이 되는 **순차 오케스트레이션**이며,
 `workflow.run(stream=True)`로 나오는 이벤트를 SSE로 그대로 중계한다.
 
+### 코드 평가 포인트
+
+| 평가 대상 | 구현 |
+|---|---|
+| Copilot SDK | `chat_client.build_agent()`가 기본 provider에서 세 개의 `GitHubCopilotAgent`를 생성 |
+| Agent Framework | `WorkflowBuilder`와 `@executor`로 extract → compose → review 연결 |
+| 도구 호출 | composer에 `get_repository_policy` 함수 도구를 주입해 검증된 라벨·담당자만 사용 |
+| 컨텍스트 | `PipelineInput → ExtractedState → ComposedState → AnalysisResult` 구조화 계약 |
+| 스트리밍 | `AgentResponseUpdate → DeltaEvent/StageEvent → SSE` |
+| Azure 전환 | 같은 `SupportsAgentRun` 계약으로 배포 시 Azure OpenAI provider만 교체 |
+
 ### 디렉터리
 
 ```
@@ -83,12 +96,13 @@ backend/
 │   │   └── history.py       분석 이력 (원문 미저장)
 │   └── core/
 │       ├── config.py        설정 + Key Vault
+│       ├── repo_ref.py      owner/repo 및 GitHub URL 정규화
 │       └── telemetry.py     App Insights
-├── infra/
-│   ├── main.bicep           Container Apps + Key Vault + App Insights
-│   └── deploy.sh            반복 가능한 배포
 └── tests/                   네트워크 불필요
 ```
+
+Azure 배포에 필요한 Bicep, 통합 Dockerfile, 사전검증·배포·패키징 스크립트는
+저장소 루트의 [`deploy/`](../deploy/)에 모아 둔다.
 
 ## API
 
@@ -154,16 +168,12 @@ GitHub에 POST하는 코드나 도구를 에이전트에 제공하지 않는다.
 
 | `MODEL_PROVIDER` | 설명 |
 |---|---|
-| `azure_openai` (기본) | Azure OpenAI / Azure AI Foundry 배포. 구조화 출력이 안정적이라 서버에 적합. API 키 없이 관리 ID로 인증 가능 |
-| `copilot_sdk` | `agent-framework-github-copilot`의 `GitHubCopilotAgent`. Copilot CLI를 JSON-RPC로 제어 |
-| ~~`github_models`~~ | **2026-07-30 폐지.** 엔드포인트가 HTTP 410을 반환한다. 과거 설정 호환용으로만 남아 있고 선택 시 경고한다 |
+| `copilot_sdk` (로컬 기본) | `agent-framework-github-copilot`의 `GitHubCopilotAgent`. 세 에이전트가 Copilot CLI 런타임을 JSON-RPC로 사용 |
+| `azure_openai` (Azure 배포) | 동일한 Agent Framework 계약을 Azure OpenAI에 연결. 관리 ID 인증 |
 
-> ⚠️ GitHub Models는 2026년 7월 30일 완전히 폐지됐다. 초안 설계는 GitHub Models를 기본으로
-> 삼았지만, 실제 호출이 `410 github_models_retirement_brownout`을 반환하는 것을 확인해
-> 기본 공급자를 Azure OpenAI로 교체했다. 오케스트레이터 코드는 `SupportsAgentRun` 덕분에
-> 한 줄도 바뀌지 않았고, 설정과 연결 계층만 교체했다.
+폐기된 GitHub Models provider는 설정과 코드에서 제거했다.
 
-`azure_openai`를 쓰려면 (`infra/deploy.sh`가 리소스·배포·권한을 자동 생성한다):
+`azure_openai`를 쓰려면 (`deploy/deploy.sh`가 리소스·배포·권한을 자동 생성한다):
 
 ```bash
 export AZURE_OPENAI_ENDPOINT=https://<리소스>.openai.azure.com/
@@ -207,7 +217,7 @@ uv pip install -e ".[copilot]"
 
 ```bash
 export GITHUB_TOKEN=ghp_...
-./infra/deploy.sh rg-meettoissue-dev koreacentral
+./deploy/deploy.sh rg-meettoissue-dev koreacentral
 ```
 
 - 관리 ID 기반 **비밀번호 없는** ACR/Key Vault 접근

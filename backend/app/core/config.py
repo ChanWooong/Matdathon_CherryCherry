@@ -40,13 +40,11 @@ class Settings(BaseSettings):
     github_token: str = Field(default="", description="이슈 생성용 GitHub 토큰")
     model_provider: str = Field(
         default="copilot_sdk",
-        description="azure_openai | copilot_sdk | github_models(폐지됨)",
+        description="copilot_sdk (로컬 기본) | azure_openai (Azure 배포)",
     )
-    # GitHub Models 전용. 2026-07-30 폐지되어 410을 반환한다.
-    model_base_url: str = "https://models.github.ai/inference"
     model_id: str = Field(
-        default="gpt-4o",
-        description="azure_openai에서는 배포(deployment) 이름",
+        default="gpt-5-mini",
+        description="Copilot 모델 ID 또는 Azure OpenAI 배포(deployment) 이름",
     )
     model_id_fast: str = "gpt-4o-mini"
     model_temperature: float = 0.2
@@ -88,10 +86,9 @@ class Settings(BaseSettings):
     @classmethod
     def _valid_provider(cls, v: str) -> str:
         v = v.strip().lower()
-        if v not in {"azure_openai", "copilot_sdk", "github_models"}:
+        if v not in {"azure_openai", "copilot_sdk"}:
             raise ValueError(
-                "MODEL_PROVIDER는 'azure_openai', 'copilot_sdk', "
-                "'github_models'(폐지됨) 중 하나여야 합니다."
+                "MODEL_PROVIDER는 'copilot_sdk' 또는 'azure_openai'여야 합니다."
             )
         return v
 
