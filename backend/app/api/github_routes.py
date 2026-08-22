@@ -11,7 +11,7 @@ from app.agents.pr_review import (
     PullRequestReviewer,
     PullRequestReviewGenerationError,
 )
-from app.api.dependencies import get_github
+from app.api.dependencies import get_github_optional
 from app.core.config import Settings, get_settings
 from app.schemas import (
     GitHubIssueSummary,
@@ -49,7 +49,7 @@ async def list_open_issues(
     owner: str,
     repo: str,
     limit: Limit = 30,
-    github: GitHubService = Depends(get_github),
+    github: GitHubService = Depends(get_github_optional),
 ) -> list[GitHubIssueSummary]:
     try:
         return await github.list_open_issues(_repo(owner, repo), limit=limit)
@@ -64,7 +64,7 @@ async def list_open_pull_requests(
     owner: str,
     repo: str,
     limit: Limit = 30,
-    github: GitHubService = Depends(get_github),
+    github: GitHubService = Depends(get_github_optional),
 ) -> list[GitHubPullRequestSummary]:
     try:
         return await github.list_open_pull_requests(_repo(owner, repo), limit=limit)
@@ -79,7 +79,7 @@ async def get_pull_request(
     owner: str,
     repo: str,
     pull_number: PullNumber,
-    github: GitHubService = Depends(get_github),
+    github: GitHubService = Depends(get_github_optional),
 ) -> GitHubPullRequestDetail:
     try:
         return await github.get_pull_request(_repo(owner, repo), pull_number)
@@ -98,7 +98,7 @@ async def review_pull_request(
     repo: str,
     pull_number: PullNumber,
     reviewer: PullRequestReviewer = Depends(get_pr_reviewer),
-    github: GitHubService = Depends(get_github),
+    github: GitHubService = Depends(get_github_optional),
 ) -> PullRequestReviewResponse:
     full_name = _repo(owner, repo)
     try:

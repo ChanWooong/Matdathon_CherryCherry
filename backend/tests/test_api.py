@@ -199,6 +199,25 @@ def test_approval_gate_precedes_token_check(tmp_path, monkeypatch):
     assert "승인" in response.json()["detail"]
 
 
+def test_create_issues_with_approval_requires_github_token(tmp_path):
+    tokenless = Settings(
+        github_token="",
+        history_db_path=str(tmp_path / "h.db"),
+        environment="test",
+    )
+    app = create_app(tokenless)
+    app.dependency_overrides[get_settings] = lambda: tokenless
+
+    with TestClient(app) as c:
+        response = c.post(
+            "/api/issues",
+            json={"repo": "acme/web", "drafts": [_draft()], "approved": True},
+        )
+
+    assert response.status_code == 401
+    assert "GitHub 토큰" in response.json()["detail"]
+
+
 @respx.mock
 def test_create_issues_reports_partial_failure(client):
     route = respx.post("https://api.github.com/repos/acme/web/issues")

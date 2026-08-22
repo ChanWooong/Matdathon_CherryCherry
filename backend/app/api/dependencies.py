@@ -7,7 +7,7 @@ import secrets
 from fastapi import Depends, HTTPException, Request
 
 from app.core.config import Settings, get_settings
-from app.services.github import GitHubError, GitHubService
+from app.services.github import GitHubService
 
 
 def require_api_key(
@@ -35,7 +35,13 @@ def get_github(
     settings: Settings = Depends(get_settings),
 ) -> GitHubService:
     """Build the GitHub client with the configured server token."""
-    try:
-        return GitHubService(settings.github_token, settings)
-    except GitHubError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    if not settings.github_token:
+        raise HTTPException(status_code=401, detail="GitHub 토큰이 설정되지 않았습니다.")
+    return GitHubService(settings.github_token, settings)
+
+
+def get_github_optional(
+    settings: Settings = Depends(get_settings),
+) -> GitHubService:
+    """Build a GitHub client for public read calls (token optional)."""
+    return GitHubService(settings.github_token or None, settings)

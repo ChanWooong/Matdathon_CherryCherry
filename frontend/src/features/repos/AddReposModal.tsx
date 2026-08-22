@@ -114,6 +114,7 @@ export function AddReposModal({ open, projectId, existing, onClose, onAdded }: P
           placeholder="https://github.com/owner/repo 또는 owner/repo"
           value={repoInput}
           onChange={(e) => setRepoInput(e.target.value)}
+          hint="토큰이 없어도 공개 레포는 링크로 찾을 수 있습니다"
         />
         <Button onClick={() => void resolveRepoByInput()} disabled={!repoInput.trim() || resolving}>
           {resolving ? '찾는 중…' : '링크로 찾기'}

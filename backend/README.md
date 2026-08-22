@@ -96,8 +96,8 @@ backend/
 |---|---|---|
 | `POST` | `/api/analyze` | 회의록 분석 (SSE 스트리밍). **아무것도 생성하지 않는다** |
 | `POST` | `/api/issues` | 승인된 초안을 이슈로 생성. `approved=true` 필수 |
-| `GET` | `/api/repos` | 접근 가능한 리포 목록 |
-| `GET` | `/api/repos/resolve?q=...` | `owner/repo` 또는 GitHub 링크를 실제 리포로 해석 |
+| `GET` | `/api/repos` | 접근 가능한 리포 목록 (토큰이 없으면 빈 배열) |
+| `GET` | `/api/repos/resolve?q=...` | `owner/repo` 또는 GitHub 링크를 실제 리포로 해석 (public 리포는 토큰 없이 조회 가능) |
 | `GET` | `/api/repos/{owner}/{repo}/labels` | 리포의 실제 라벨 |
 | `GET` | `/api/repos/{owner}/{repo}/issues?limit=30` | 열린 이슈 (`1..100`, PR 제외) |
 | `GET` | `/api/repos/{owner}/{repo}/pulls?limit=30` | 열린 PR |
