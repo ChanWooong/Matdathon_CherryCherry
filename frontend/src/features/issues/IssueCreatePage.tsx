@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  agents as agentsApi, issues as issuesApi, meetings as meetingsApi,
+  agents as agentsApi, meetings as meetingsApi,
   projects as projectsApi, repos as reposApi,
 } from '../../api';
 import { BackLink, Header, Page, PageHead } from '../../components/layout';
@@ -13,10 +13,10 @@ import { AgentRail } from '../../components/domain/AgentRail';
 import { DraftCard } from '../../components/domain/DraftCard';
 import { useAsync } from '../../lib/useAsync';
 import { preview, relativeTime } from '../../lib/format';
-import type { AgentState, CreateResult, Decision, Draft } from '../../types';
+import type { AgentState, Decision, Draft } from '../../types';
 import s from './IssueCreatePage.module.css';
 
-type Stage = 'pick' | 'run' | 'review' | 'done';
+type Stage = 'pick' | 'run' | 'review';
 
 const INITIAL_AGENTS: AgentState[] = [
   { id: 'extractor', name: '추출 에이전트', icon: 'quote', status: 'idle', note: '회의록에서 결정사항과 할 일을 골라냅니다' },
@@ -41,11 +41,8 @@ export function IssueCreatePage() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [runError, setRunError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [results, setResults] = useState<CreateResult[]>([]);
-  const [analysisDurationMs, setAnalysisDurationMs] = useState<number | null>(null);
+  const [copying, setCopying] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const analysisDurationRef = useRef(0);
 
   const repos = useMemo(() => repoList.data ?? [], [repoList.data]);
   const notes = useMemo(() => meetingList.data ?? [], [meetingList.data]);
@@ -82,10 +79,7 @@ export function IssueCreatePage() {
     setAgents(INITIAL_AGENTS.map((a) => ({ ...a, status: 'idle', note: a.note, ms: undefined, progress: undefined })));
     setDecisions([]);
     setDrafts([]);
-    setResults([]);
-    setAnalysisDurationMs(null);
     setRunError(null);
-    analysisDurationRef.current = 0;
 
     try {
       await agentsApi.runIssuePipeline(
@@ -114,7 +108,6 @@ export function IssueCreatePage() {
               })));
               break;
             case 'agent_done':
-              analysisDurationRef.current += e.ms;
               setAgent(e.agent, { status: 'done', note: e.note, ms: e.ms, progress: undefined });
               break;
             case 'error':
@@ -122,7 +115,6 @@ export function IssueCreatePage() {
               setRunError(e.message);
               break;
             case 'done':
-              setAnalysisDurationMs(analysisDurationRef.current);
               setStage((cur) => (cur === 'run' ? 'review' : cur));
               break;
           }
@@ -143,28 +135,51 @@ export function IssueCreatePage() {
 
   const picked = drafts.filter((d) => d.selected);
 
-  async function createIssues() {
-    if (picked.length === 0 || !repo || creating) return;
-    setCreating(true);
+  const issueDraftText = useMemo(() => {
+    if (!repo || picked.length === 0) return '';
+    return picked
+      .map((draft, index) => {
+        const labels = draft.labels.length > 0 ? draft.labels.map((label) => `\`${label}\``).join(', ') : '-';
+        const assignee = draft.assignee ?? '-';
+        const due = draft.due ?? '-';
+        const criteria = draft.ac
+          .map((criterion, criterionIndex) => `${criterionIndex + 1}. ${criterion.text}`)
+          .join('\n');
+        return [
+          `### ${index + 1}. ${draft.title}`,
+          `- Repository: ${repo.fullName}`,
+          `- Labels: ${labels}`,
+          `- Assignee: ${assignee}`,
+          `- Due: ${due}`,
+          '',
+          '#### Body',
+          draft.body.trim() || '-',
+          '',
+          '#### Acceptance Criteria',
+          criteria || '-',
+          '',
+          '#### Evidence',
+          draft.evidence.trim() || '-',
+        ].join('\n');
+      })
+      .join('\n\n---\n\n');
+  }, [picked, repo]);
+
+  async function copyIssueText() {
+    if (!issueDraftText || copying) return;
+    setCopying(true);
     try {
-      const res = await issuesApi.createIssuesFromDrafts(repo.id, picked, meetingId ?? undefined);
-      setResults(res);
-      setStage('done');
-      const succeeded = res.filter((result) => result.ok).length;
-      const failed = res.length - succeeded;
-      toast(
-        failed ? `${succeeded}건 생성, ${failed}건 실패했습니다` : `이슈 ${succeeded}건을 만들었습니다`,
-        failed ? 'error' : 'success',
-      );
+      await navigator.clipboard.writeText(issueDraftText);
+      toast(`초안 ${picked.length}건을 클립보드에 복사했습니다`, 'success');
     } catch (e) {
-      toast(e instanceof Error ? e.message : '이슈를 만들지 못했습니다', 'error');
+      toast(e instanceof Error ? e.message : '클립보드 복사에 실패했습니다', 'error');
     } finally {
-      setCreating(false);
+      setCopying(false);
     }
   }
 
-  const stepIndex = stage === 'pick' ? 0 : stage === 'run' ? 1 : stage === 'review' ? 2 : 3;
-  const STEPS = ['회의록 고르기', '읽고 정리하기', '확인하고 승인', '생성 완료'];
+  const stepIndex = stage === 'pick' ? 0 : stage === 'run' ? 1 : 2;
+  const STEPS = ['회의록 고르기', '읽고 정리하기', '확인하고 복사'];
 
   return (
     <>
@@ -182,7 +197,7 @@ export function IssueCreatePage() {
         <PageHead
           eyebrow={<><Icon name="issue" size={13} /> 이슈 만들기</>}
           title="회의록에서 이슈 만들기"
-          desc="프로젝트에 보관된 회의록을 골라 읽어내고, 확인한 초안만 이슈로 올립니다."
+          desc="프로젝트 회의록으로 이슈 초안을 만든 뒤, 텍스트를 복사해 수동으로 등록합니다."
         />
 
         <div className={s.steps}>
@@ -317,13 +332,23 @@ export function IssueCreatePage() {
               {stage === 'review' && drafts.length > 0 && (
                 <div className={s.actions}>
                   <span className={s.actionsNote}>
-                    {picked.length}건을 <b style={{ fontFamily: 'var(--font-mono)' }}>{repo?.fullName}</b> 에 올립니다.
-                    승인하기 전까지 GitHub 에는 아무것도 만들어지지 않습니다.
+                    {picked.length}건을 <b style={{ fontFamily: 'var(--font-mono)' }}>{repo?.fullName}</b> 용 초안으로 복사합니다.
+                    GitHub 업로드는 하지 않습니다.
                   </span>
                   <Button onClick={() => setStage('pick')}>다시 고르기</Button>
-                  <Button variant="primary" icon="send" disabled={picked.length === 0 || creating} onClick={() => void createIssues()}>
-                    {creating ? '만드는 중…' : `${picked.length}건 이슈로 만들기`}
+                  <Button variant="primary" icon="copy" disabled={picked.length === 0 || copying} onClick={() => void copyIssueText()}>
+                    {copying ? '복사 중…' : `${picked.length}건 이슈 글 복사`}
                   </Button>
+                </div>
+              )}
+              {stage === 'review' && picked.length > 0 && (
+                <div style={{ marginTop: 'var(--sp-4)' }}>
+                  <Card>
+                    <CardHead title="복사용 이슈 텍스트" sub="그대로 복사해서 GitHub 이슈 본문에 붙여넣으세요" />
+                    <CardBody>
+                      <textarea className={s.copyPreview} value={issueDraftText} readOnly />
+                    </CardBody>
+                  </Card>
                 </div>
               )}
             </div>
@@ -350,69 +375,6 @@ export function IssueCreatePage() {
                   </CardBody>
                 </Card>
               )}
-            </aside>
-          </div>
-        )}
-
-        {/* ---------------------------- 4. 완료 ------------------------------ */}
-        {stage === 'done' && (
-          <div className={s.split}>
-            <div>
-              <Banner
-                tone={results.some((result) => !result.ok) ? 'warn' : 'success'}
-                title={`성공 ${results.filter((result) => result.ok).length}건 · 실패 ${results.filter((result) => !result.ok).length}건`}
-              >
-                성공한 이슈는 {repo?.fullName}에 등록되었습니다.
-              </Banner>
-              <div className={s.results} style={{ marginTop: 'var(--sp-4)' }}>
-                {results.map((r) => (
-                  <div key={r.draftId} className={s.result}>
-                    <Icon name={r.ok ? 'check-circle' : 'alert'} size={16} />
-                    <span className={s.resultTitle}>{r.title}</span>
-                    {r.ok ? (
-                      <>
-                        <span className={s.resultNum}>#{r.number}</span>
-                        <Button size="sm" icon="external" onClick={() => r.url && window.open(r.url, '_blank', 'noopener')}>
-                          열기
-                        </Button>
-                      </>
-                    ) : (
-                      <span className={s.resultNum}>{r.error ?? '생성 실패'}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <aside className={s.aside}>
-              <Card>
-                <CardHead title="자동화 효과" sub="이번 실행 기준" />
-                <CardBody>
-                  <div className={s.summary}>
-                    <div className={s.sumRow}>
-                      <b>{analysisDurationMs ? `${(analysisDurationMs / 1000).toFixed(1)}초` : '측정 중'}</b>
-                      <span>회의록 분석 완료 시간</span>
-                    </div>
-                    <div className={s.sumRow}><b>3단계 검수</b><span>추출 · 구조화 · 누락 확인</span></div>
-                    <div className={s.sumRow}><b>{results.filter((result) => result.ok).length}건 생성</b><span>승인 후 실제 GitHub 반영</span></div>
-                  </div>
-                </CardBody>
-              </Card>
-              <Card>
-                <CardHead title="다음으로" />
-                <CardBody>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    <Button block icon="issue" onClick={() => nav(`/p/${projectId}/repos/${repo?.id}`)}>
-                      이슈 목록 보기
-                    </Button>
-                    <Button block icon="note" onClick={() => { setStage('pick'); setDrafts([]); }}>
-                      다른 회의록으로 또 만들기
-                    </Button>
-                    <Button block icon="folder" onClick={() => nav(`/p/${projectId}`)}>
-                      프로젝트로 돌아가기
-                    </Button>
-                  </div>
-                </CardBody>
-              </Card>
             </aside>
           </div>
         )}
