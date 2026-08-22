@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # -- 모델 -------------------------------------------------------------
     github_token: str = Field(default="", description="이슈 생성용 GitHub 토큰")
     model_provider: str = Field(
-        default="azure_openai",
+        default="copilot_sdk",
         description="azure_openai | copilot_sdk | github_models(폐지됨)",
     )
     # GitHub Models 전용. 2026-07-30 폐지되어 410을 반환한다.
