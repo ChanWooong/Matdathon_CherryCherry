@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from app.core.repo_ref import normalize_repo_ref
 
@@ -21,15 +21,26 @@ AI_NOTICE = "🤖 AI가 생성한 초안입니다. 병합 전 반드시 검토�
 class Decision(BaseModel):
     """회의에서 확정된 결정사항."""
 
-    statement: str = Field(description="결정된 내용 한 문장")
-    evidence: str = Field(description="회의록 원문에서 그대로 인용한 근거 문장")
+    statement: str = Field(
+        validation_alias=AliasChoices("statement", "title"),
+        description="결정된 내용 한 문장",
+    )
+    evidence: str = Field(
+        default="",
+        validation_alias=AliasChoices("evidence", "quote", "source"),
+        description="회의록 원문에서 그대로 인용한 근거 문장",
+    )
 
 
 class ExtractedTask(BaseModel):
     """회의록에서 추출한 할 일 하나."""
 
     title: str = Field(description="할 일을 요약한 한 문장")
-    detail: str = Field(default="", description="맥락 및 배경 설명")
+    detail: str = Field(
+        default="",
+        validation_alias=AliasChoices("detail", "description", "context"),
+        description="맥락 및 배경 설명",
+    )
     assignee: str | None = Field(
         default=None, description="회의록에 명시된 담당자. 불명확하면 null"
     )
@@ -37,7 +48,8 @@ class ExtractedTask(BaseModel):
         default=None, description="기한. 회의록 표현 그대로(예: '다음 주 금요일'). 없으면 null"
     )
     evidence: str = Field(
-        description="이 할 일의 근거가 되는 회의록 원문 인용 (환각 완화용, 필수)"
+        default="",
+        description="이 할 일의 근거가 되는 회의록 원문 인용 (환각 완화용)"
     )
 
 
