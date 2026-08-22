@@ -1,10 +1,9 @@
-"""모델 공급자 선택 로직 테스트.
-
-GitHub Models가 2026-07-30 폐지되면서 기본 공급자가 azure_openai로 바뀌었다.
-설정 오류가 런타임 깊은 곳이 아니라 초기화 시점에 드러나는지 확인한다.
-"""
+"""Copilot SDK / Azure OpenAI 공급자 선택 로직 테스트."""
 
 from __future__ import annotations
+
+import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,8 +19,38 @@ def _agent(**overrides):
     )
 
 
-def test_default_provider_is_azure_openai():
-    assert Settings().model_provider == "azure_openai"
+def test_default_provider_is_copilot_sdk():
+    assert Settings().model_provider == "copilot_sdk"
+
+
+def test_copilot_sdk_builds_agent_with_framework_tools(monkeypatch):
+    created: dict = {}
+
+    class FakeCopilotAgent:
+        def __init__(self, instructions, **kwargs):
+            created.update(instructions=instructions, **kwargs)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "agent_framework.github",
+        SimpleNamespace(GitHubCopilotAgent=FakeCopilotAgent),
+    )
+    tool = lambda: "repository policy"  # noqa: E731
+
+    agent = build_agent(
+        name="composer",
+        instructions="compose issues",
+        settings=Settings(model_provider="copilot_sdk"),
+        tools=[tool],
+    )
+
+    assert isinstance(agent, FakeCopilotAgent)
+    assert created == {
+        "instructions": "compose issues",
+        "name": "composer",
+        "tools": [tool],
+        "default_options": {"model": "gpt-5-mini"},
+    }
 
 
 def test_unknown_provider_is_rejected_at_settings_level():
@@ -63,8 +92,6 @@ def test_azure_client_targets_the_deployment_url():
     assert "deployments/my-deployment" in str(inner.base_url)
 
 
-def test_retired_github_models_warns(caplog):
-    """폐지된 공급자를 고르면 조용히 실패하지 말고 이유를 알려줘야 한다."""
-    with caplog.at_level("WARNING"):
-        _agent(model_provider="github_models", github_token="t")
-    assert any("폐지" in r.message for r in caplog.records)
+def test_retired_github_models_is_rejected():
+    with pytest.raises(ValueError, match="MODEL_PROVIDER"):
+        Settings(model_provider="github_models")

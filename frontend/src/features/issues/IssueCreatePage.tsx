@@ -43,7 +43,9 @@ export function IssueCreatePage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [results, setResults] = useState<CreateResult[]>([]);
+  const [analysisDurationMs, setAnalysisDurationMs] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const analysisDurationRef = useRef(0);
 
   const repos = useMemo(() => repoList.data ?? [], [repoList.data]);
   const notes = useMemo(() => meetingList.data ?? [], [meetingList.data]);
@@ -81,7 +83,9 @@ export function IssueCreatePage() {
     setDecisions([]);
     setDrafts([]);
     setResults([]);
+    setAnalysisDurationMs(null);
     setRunError(null);
+    analysisDurationRef.current = 0;
 
     try {
       await agentsApi.runIssuePipeline(
@@ -110,6 +114,7 @@ export function IssueCreatePage() {
               })));
               break;
             case 'agent_done':
+              analysisDurationRef.current += e.ms;
               setAgent(e.agent, { status: 'done', note: e.note, ms: e.ms, progress: undefined });
               break;
             case 'error':
@@ -117,6 +122,7 @@ export function IssueCreatePage() {
               setRunError(e.message);
               break;
             case 'done':
+              setAnalysisDurationMs(analysisDurationRef.current);
               setStage((cur) => (cur === 'run' ? 'review' : cur));
               break;
           }
@@ -379,12 +385,15 @@ export function IssueCreatePage() {
             </div>
             <aside className={s.aside}>
               <Card>
-                <CardHead title="자동화 효과" sub="데모 기준" />
+                <CardHead title="자동화 효과" sub="이번 실행 기준" />
                 <CardBody>
                   <div className={s.summary}>
-                    <div className={s.sumRow}><b>30분 → 1분</b><span>회의 후 수작업 정리 시간</span></div>
+                    <div className={s.sumRow}>
+                      <b>{analysisDurationMs ? `${(analysisDurationMs / 1000).toFixed(1)}초` : '측정 중'}</b>
+                      <span>회의록 분석 완료 시간</span>
+                    </div>
                     <div className={s.sumRow}><b>3단계 검수</b><span>추출 · 구조화 · 누락 확인</span></div>
-                    <div className={s.sumRow}><b>근거 보존</b><span>모든 초안에 회의록 인용 포함</span></div>
+                    <div className={s.sumRow}><b>{results.filter((result) => result.ok).length}건 생성</b><span>승인 후 실제 GitHub 반영</span></div>
                   </div>
                 </CardBody>
               </Card>
