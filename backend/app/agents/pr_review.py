@@ -64,10 +64,14 @@ class PullRequestReviewer:
                 + f"\n\n[diff truncated by server after {maximum} characters]"
             )
 
+        run_options = None
+        if self._settings.model_provider != "copilot_sdk":
+            run_options = {"response_format": PullRequestReviewModelOutput}
+
         stream = self._agent.run(
             self._prompt(pull, diff),
             stream=True,
-            options={"response_format": PullRequestReviewModelOutput},
+            options=run_options,
         )
         async for _update in stream:
             pass

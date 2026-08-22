@@ -11,7 +11,14 @@ from app.agents.pipeline import (
     build_workflow,
 )
 from app.core.config import Settings
-from app.schemas import AnalysisResult, DeltaEvent, LabelSummary, StageEvent, StageStatus
+from app.schemas import (
+    AnalysisResult,
+    DeltaEvent,
+    ExtractionResult,
+    LabelSummary,
+    StageEvent,
+    StageStatus,
+)
 from tests.fakes import scripted_agent
 
 EXTRACTION = {
@@ -177,3 +184,15 @@ def test_repository_policy_tool_exposes_only_server_verified_values():
         '{"repo": "acme/web", "allowed_labels": ["bug", "p0"], '
         '"allowed_assignees": ["chanwoong"]}'
     )
+
+
+def test_extraction_result_accepts_title_alias_for_decisions():
+    result = ExtractionResult.model_validate(
+        {
+            "summary": "요약",
+            "decisions": [{"title": "배포 순서 프로덕션으로 정함"}],
+            "tasks": [],
+            "open_questions": [],
+        }
+    )
+    assert result.decisions[0].statement == "배포 순서 프로덕션으로 정함"
