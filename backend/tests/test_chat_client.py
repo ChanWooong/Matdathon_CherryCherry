@@ -40,7 +40,7 @@ def test_copilot_sdk_builds_agent_with_framework_tools(monkeypatch):
     agent = build_agent(
         name="composer",
         instructions="compose issues",
-        settings=Settings(model_provider="copilot_sdk"),
+        settings=Settings(model_provider="copilot_sdk", model_id="gpt-5-mini"),
         tools=[tool],
     )
 
@@ -95,3 +95,17 @@ def test_azure_client_targets_the_deployment_url():
 def test_retired_github_models_is_rejected():
     with pytest.raises(ValueError, match="MODEL_PROVIDER"):
         Settings(model_provider="github_models")
+
+
+def test_production_requires_azure_openai_provider():
+    with pytest.raises(ValueError, match="ENVIRONMENT=prod.*azure_openai"):
+        Settings(environment="prod", model_provider="copilot_sdk")
+
+
+def test_production_azure_requires_endpoint():
+    with pytest.raises(ValueError, match="AZURE_OPENAI_ENDPOINT"):
+        Settings(
+            environment="prod",
+            model_provider="azure_openai",
+            azure_openai_endpoint="",
+        )
