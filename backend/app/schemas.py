@@ -171,6 +171,22 @@ class CompositionResult(BaseModel):
 
     drafts: list[IssueDraft] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_drafts_shape(cls, value: Any) -> Any:
+        if isinstance(value, list):
+            return {"drafts": value}
+        if not isinstance(value, dict):
+            return value
+        if "drafts" in value:
+            return value
+        items = value.get("items")
+        if isinstance(items, list):
+            return {"drafts": items}
+        if "draft_id" in value or "title" in value:
+            return {"drafts": [value]}
+        return value
+
 
 # --------------------------------------------------------------------------
 # 3단계: 검수 에이전트 (Reviewer) 출력

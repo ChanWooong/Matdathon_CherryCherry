@@ -7,12 +7,14 @@ import pytest
 from app.agents.pipeline import (
     PipelineInput,
     StageFailure,
+    _coerce,
     _repository_policy_tool,
     build_workflow,
 )
 from app.core.config import Settings
 from app.schemas import (
     AnalysisResult,
+    CompositionResult,
     DeltaEvent,
     ExtractionResult,
     LabelSummary,
@@ -223,3 +225,14 @@ def test_extraction_result_accepts_copilot_style_shapes():
     assert result.tasks[0].assignee == "민지"
     assert result.tasks[1].due == "다음 주"
     assert result.open_questions == ["온보딩 문서 범위 확정 필요"]
+
+
+def test_coerce_accepts_composition_json_with_trailing_text():
+    payload = (
+        '{"draft_id":"draft-1","title":"초안","body":"본문","labels":[],'
+        '"assignees":[],"acceptance_criteria":[]}\\n'
+        "모델 설명 텍스트"
+    )
+    result = _coerce(payload, CompositionResult)
+    assert len(result.drafts) == 1
+    assert result.drafts[0].title == "초안"
