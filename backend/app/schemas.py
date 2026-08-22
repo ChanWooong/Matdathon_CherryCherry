@@ -131,7 +131,10 @@ class AcceptanceCriterion(BaseModel):
     """
 
     id: str = Field(description="AC1, AC2 형태의 안정적인 식별자")
-    text: str = Field(description="객관적으로 검증 가능한 완료 조건")
+    text: str = Field(
+        validation_alias=AliasChoices("text", "description", "criterion", "criteria"),
+        description="객관적으로 검증 가능한 완료 조건",
+    )
 
 
 class IssueDraft(BaseModel):
