@@ -1,0 +1,83 @@
+.rail {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.agent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition: border-color .16s ease, background-color .16s ease;
+}
+.running { border-color: var(--clay-200); background: var(--clay-050); }
+.done { border-color: var(--line); }
+.error { border-color: var(--brick-100); background: var(--brick-050); }
+
+.mark {
+  width: 26px; height: 26px;
+  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--paper-sunk);
+  color: var(--ink-400);
+}
+.running .mark { border-color: var(--clay-200); background: var(--surface); color: var(--clay); }
+.done .mark { border-color: var(--moss-100); background: var(--moss-050); color: var(--moss); }
+.error .mark { border-color: var(--brick-100); background: var(--surface); color: var(--brick); }
+
+.body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--ink-900);
+}
+.idle .name { color: var(--ink-400); font-weight: 400; }
+.step {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+}
+.note {
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+  line-height: 1.6;
+  min-height: 1.6em;
+  word-break: break-word;
+}
+.caret {
+  display: inline-block;
+  width: 6px;
+  height: 1em;
+  vertical-align: -2px;
+  background: var(--clay);
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.ms {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  flex: none;
+  margin-left: auto;
+}
+
+.track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--paper-sunk);
+  overflow: hidden;
+  margin-top: 5px;
+}
+.fill { height: 100%; background: var(--clay); transition: width .3s ease; }
+
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }

@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
     if not settings.github_token:
         logger.warning(
-            "GITHUB_TOKEN이 비어 있습니다. 모델 추론과 이슈 생성이 모두 실패합니다."
+            "GITHUB_TOKEN이 비어 있습니다. GitHub 리포 조회와 이슈 생성이 실패합니다."
         )
 
     logger.info(

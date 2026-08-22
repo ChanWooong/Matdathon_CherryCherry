@@ -1,0 +1,30 @@
+.repoTitle { display: flex; align-items: center; gap: var(--sp-2); }
+.owner { color: var(--ink-400); font-weight: 400; }
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-4) 0 var(--sp-3);
+}
+.filters > :first-child { max-width: 280px; flex: 1; }
+.right { margin-left: auto; display: flex; gap: var(--sp-2); }
+
+.issueTitle { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.num {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+}
+.labels { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+
+.state { display: inline-flex; align-items: center; gap: 5px; }
+.open { color: var(--moss); }
+.merged { color: var(--slate); }
+.closed { color: var(--brick); }
+
+.diff { font-family: var(--font-mono); font-size: var(--text-xs); }
+.add { color: var(--moss); }
+.del { color: var(--brick); }
+
+.who { font-size: var(--text-sm); color: var(--ink-500); }

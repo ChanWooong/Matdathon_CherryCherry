@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     model_id_fast: str = "gpt-4o-mini"
     model_temperature: float = 0.2
     model_timeout_s: float = 60.0
+    pr_review_max_diff_chars: int = Field(default=100_000, ge=1_000, le=1_000_000)
 
     # -- 파이프라인 -------------------------------------------------------
     max_retries: int = Field(default=2, description="에이전트 단계별 재시도 횟수")
