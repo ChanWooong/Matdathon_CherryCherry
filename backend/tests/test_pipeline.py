@@ -237,3 +237,25 @@ def test_coerce_accepts_composition_json_with_trailing_text():
     assert len(result.drafts) == 1
     assert result.drafts[0].title == "초안"
     assert result.drafts[0].acceptance_criteria[0].text == "조건"
+
+
+def test_composition_result_accepts_copilot_draft_shape_variants():
+    result = CompositionResult.model_validate(
+        {
+            "id": "draft-2",
+            "title": "SSE keep-alive 추가",
+            "description": "본문 대체 설명",
+            "labels": [{"name": "bug"}, "infra"],
+            "assignees": [{"login": "chanwoong"}],
+            "acceptanceCriteria": [
+                {"id": "AC1", "description": "연결이 30초 이상 유지된다."}
+            ],
+        }
+    )
+    assert len(result.drafts) == 1
+    draft = result.drafts[0]
+    assert draft.draft_id == "draft-2"
+    assert draft.body == "본문 대체 설명"
+    assert draft.labels == ["bug", "infra"]
+    assert draft.assignees == ["chanwoong"]
+    assert draft.acceptance_criteria[0].text == "연결이 30초 이상 유지된다."
