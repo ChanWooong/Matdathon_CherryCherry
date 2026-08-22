@@ -1,0 +1,27 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: var(--sp-5);
+}
+
+.loading {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: var(--sp-5);
+}
+.ghost {
+  height: 140px;
+  border: 1px solid var(--line);
+  border-radius: 0 var(--r-lg) var(--r-lg) var(--r-lg);
+  background: var(--surface);
+}
+
+.hint {
+  margin-top: var(--sp-8);
+  padding: var(--sp-4);
+  border-left: 2px solid var(--line-strong);
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+  line-height: 1.8;
+}
+.hint b { color: var(--ink-700); font-weight: 600; }

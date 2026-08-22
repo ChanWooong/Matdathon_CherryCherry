@@ -1,0 +1,25 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.6;
+  background: var(--surface);
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+
+.clay  { background: var(--clay-050);  border-color: var(--clay-200);  color: var(--clay-700); }
+.moss  { background: var(--moss-050);  border-color: var(--moss-100);  color: var(--moss-700); }
+.ochre { background: var(--ochre-050); border-color: var(--ochre-100); color: var(--ochre-700); }
+.brick { background: var(--brick-050); border-color: var(--brick-100); color: var(--brick-700); }
+.slate { background: var(--slate-100); border-color: var(--slate-100); color: var(--slate-700); }
+.sunk  { background: var(--paper-sunk); border-color: var(--line); color: var(--ink-500); }
+
+/* 저장소/브랜치처럼 식별자를 보여줄 때 */
+.mono { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: -.1px; }

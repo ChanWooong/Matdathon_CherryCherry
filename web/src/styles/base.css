@@ -1,0 +1,69 @@
+@import './tokens.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink-700);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-serif);
+  color: var(--ink-900);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin: 0;
+}
+
+h1 { font-size: var(--text-2xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+h4 { font-size: var(--text-md); }
+
+p { margin: 0; }
+
+a { color: var(--clay-600); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, kbd, pre { font-family: var(--font-mono); font-size: 0.92em; }
+
+button { font: inherit; color: inherit; }
+
+::selection { background: var(--clay-100); }
+
+:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* 얇은 스크롤바 — 기본 스크롤바의 과한 존재감을 줄인다 */
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: var(--r-pill); border: 2px solid var(--paper); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- 공용 유틸 (레이아웃 보조만, 스타일은 컴포넌트에서) ------------------ */
+.u-row { display: flex; align-items: center; gap: var(--sp-2); }
+.u-row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.u-col { display: flex; flex-direction: column; gap: var(--sp-2); }
+.u-wrap { flex-wrap: wrap; }
+.u-grow { flex: 1; min-width: 0; }
+.u-muted { color: var(--ink-500); }
+.u-sm { font-size: var(--text-sm); }
+.u-xs { font-size: var(--text-xs); }
+.u-mono { font-family: var(--font-mono); }
+.u-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
